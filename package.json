@@ -1,0 +1,29 @@
+{
+  "name": "extensions-hub",
+  "version": "1.0.0",
+  "description": "extension sandbox",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack",
+    "start": "web-ext run --firefox=nightly",
+    "watch": "webpack --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/firefox-webext-browser": "^120.0.4",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "web-ext": "^8.7.1",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "css-loader": "^7.1.2",
+    "lit": "^3.3.0",
+    "style-loader": "^4.0.0",
+    "zod": "^3.25.57"
+  }
+}

@@ -1,0 +1,93 @@
+:root {
+  --color-background: #000;
+  --color-surface: #202020;
+  --color-surface-alt: #424242;
+  --color-primary: #007bff;
+  --color-border: #ccc;
+  --color-text: #ffffff;
+  --color-info: rgb(0, 119, 255);
+}
+
+body {
+  margin: 0;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+h1 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+moz-extension-hub-settings {
+  .wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  h3 {
+    margin: 0 0 12px 0;
+    padding: 0;
+  }
+
+  .card {
+    padding: 12px;
+    background-color: var(--color-surface);
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+  }
+
+  .select {
+    padding: 8px;
+    font-size: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    box-sizing: border-box;
+    background-color: var(--color-surface-alt);
+    color: var(--color-text);
+  }
+
+  .select-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .text-input {
+    padding: 8px;
+    border: 1px solid var(--color-primary);
+    border-radius: 4px;
+    background-color: var(--color-surface-alt);
+    color: var(--color-text);
+    display: flex;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .label {
+    font-size: 12px;
+    color: var(--color-text);
+  }
+
+  .fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .info {
+    margin: 0 0 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--color-text);
+    background-color: var(--color-info);
+    padding: 12px;
+    border-radius: 8px;
+  }
+}

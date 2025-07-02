@@ -1,0 +1,52 @@
+:root {
+  --color-surface: #202020;
+  --color-surface-alt: #424242;
+  --color-primary: #007bff;
+  --color-border: #ccc;
+  --color-text: #ffffff;
+}
+
+moz-extension-hub {
+  .wrapper {
+    background-color: var(--color-surface);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    color: var(--color-text);
+  }
+
+  .select {
+    padding: 8px;
+    font-size: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    box-sizing: border-box;
+    background-color: var(--color-surface-alt);
+    color: var(--color-text);
+  }
+
+  .text-input {
+    padding: 8px;
+    border: 1px solid var(--color-primary);
+    border-radius: 4px;
+    background-color: var(--color-surface-alt);
+    color: var(--color-text);
+    display: flex;
+    width: 100%;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .settings-button {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text);
+  }
+}
