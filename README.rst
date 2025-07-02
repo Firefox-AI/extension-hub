@@ -1,4 +1,4 @@
-Extension Sandbox
+Extension Hub
 =====================================
 
 The primary purpose of this extension is to sandbox ideas.
