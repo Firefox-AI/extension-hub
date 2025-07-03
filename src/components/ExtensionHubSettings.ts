@@ -1,5 +1,6 @@
 import { LitElement, html } from 'lit'
 import { LocalStorageKeys } from '../../const'
+import { EngineMetadataT } from '../../types'
 
 const defaultOpenAiModel = 'gpt-4o'
 class ExtensionHubSettings extends LitElement {
@@ -7,11 +8,17 @@ class ExtensionHubSettings extends LitElement {
   apikey: string = ''
   aiModel: string = defaultOpenAiModel
   source: 'openai' | 'local' = 'openai'
+  engineMetadata: EngineMetadataT = {
+    taskName: '',
+    modelHub: '',
+    modelId: '',
+  }
 
   static properties = {
     feature: { type: String },
     apikey: { type: String },
     aiModel: { type: String },
+    engineMetadata: { type: Object },
     source: { type: String },
   }
 
@@ -28,11 +35,21 @@ class ExtensionHubSettings extends LitElement {
   }
 
   async initLocalStorageData() {
-    const { openai_ai_model, openai_api_key } = await browser.storage.local.get(
-      [LocalStorageKeys.OPENAI_API_KEY, LocalStorageKeys.OPENAI_AI_MODEL]
-    )
+    console.log('Initializing local storage data...')
+    const { openai_ai_model, openai_api_key, engine_metadata } =
+      await browser.storage.local.get([
+        LocalStorageKeys.OPENAI_API_KEY,
+        LocalStorageKeys.OPENAI_AI_MODEL,
+        LocalStorageKeys.ENGINE_METADATA,
+      ])
     this.apikey = openai_api_key || ''
     this.aiModel = openai_ai_model || defaultOpenAiModel
+    this.engineMetadata = {
+      taskName: engine_metadata?.taskName || '',
+      modelHub: engine_metadata?.modelHub || '',
+      modelId: engine_metadata?.modelId || '',
+      engineCreated: engine_metadata?.engineCreated ?? false,
+    }
   }
 
   handleApiKeyInput(event: Event) {
@@ -54,6 +71,18 @@ class ExtensionHubSettings extends LitElement {
   handleSourceSelectChange(event: Event) {
     // TODO: Implement logic to handle source selection change
     const select = event.target as HTMLSelectElement
+  }
+
+  handleUpdateEngineMetadata(
+    e: Event,
+    key: keyof Omit<EngineMetadataT, 'engineCreated'>
+  ) {
+    const input = e.target as HTMLInputElement
+    this.engineMetadata[key] = input.value
+    // Update the engine metadata in
+    browser.storage.local.set({
+      engine_metadata: this.engineMetadata,
+    })
   }
 
   render() {
@@ -112,16 +141,40 @@ class ExtensionHubSettings extends LitElement {
           </p>
           <div class="fields">
             <div>
-              <label class="label">Model Name</label>
-              <input type="text" placeholder="Model Name" class="text-input" />
+              <label class="label">Model Name (ID)</label>
+              <input
+                @input="${(e: Event) => {
+                  this.handleUpdateEngineMetadata(e, 'modelId')
+                }}"
+                type="text"
+                placeholder="Model Name (ID)"
+                class="text-input"
+                value="${this.engineMetadata.modelId}"
+              />
             </div>
             <div>
               <label class="label">Model Task</label>
-              <input type="text" placeholder="Model Task" class="text-input" />
+              <input
+                @input="${(e: Event) => {
+                  this.handleUpdateEngineMetadata(e, 'taskName')
+                }}"
+                type="text"
+                placeholder="Model Task"
+                class="text-input"
+                value="${this.engineMetadata.taskName}"
+              />
             </div>
             <div>
               <label class="label">Model Hub</label>
-              <input type="text" placeholder="Model Hub" class="text-input" />
+              <input
+                @input="${(e: Event) => {
+                  this.handleUpdateEngineMetadata(e, 'modelHub')
+                }}"
+                type="text"
+                placeholder="Model Hub"
+                class="text-input"
+                value="${this.engineMetadata.modelHub}"
+              />
             </div>
           </div>
         </div>

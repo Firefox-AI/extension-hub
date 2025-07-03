@@ -14,3 +14,10 @@ export type PromptDataT = {
   prompt: string
   fullText: string
 }
+
+export type EngineMetadataT = {
+  taskName: string
+  modelHub: string
+  modelId: string
+  engineCreated?: boolean
+}

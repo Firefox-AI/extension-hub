@@ -1,7 +1,7 @@
-import MozQuestionAnswer from './components/MozQuestionAnswer'
-import MozExtensionHub from './components/ExtensionHub'
-import MozChat from './components/MozChat'
+import MozQuestionAnswer from './features/MozQuestionAnswer'
+import MozChat from './features/MozChat'
+import ExtensionHub from './components/ExtensionHub'
 
 customElements.define('moz-question-answer', MozQuestionAnswer)
-customElements.define('moz-extension-hub', MozExtensionHub)
+customElements.define('moz-extension-hub', ExtensionHub)
 customElements.define('moz-chat', MozChat)

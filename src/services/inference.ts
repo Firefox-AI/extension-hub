@@ -49,14 +49,20 @@ const ensureEngineIsReady = async () => {
   if (engineCreated) return
   console.log('Creating engine...')
   try {
+    const engineMetadata = await browser.storage.session.get(
+      LocalStorageKeys.ENGINE_METADATA
+    )
     const trial = (browser as unknown as mlBrowserT).trial
 
+    // TODO consider better defaults
     await trial?.ml.createEngine({
-      taskName: 'summarization',
-      modelHub: 'huggingface',
-      modelId: 'Xenova/distilbart-cnn-6-6',
+      taskName: engineMetadata.taskName || 'summarization',
+      modelHub: engineMetadata.modelHub || 'huggingface',
+      modelId: engineMetadata.modelId || 'Xenova/distilbart-cnn-6-6',
     })
-    await browser.storage.session.set({ engineCreated: true })
+    // Set the engineCreated flag to true
+    engineMetadata.engineCreated = true
+    await browser.storage.session.set({ engine_metadata: engineMetadata })
   } catch (err) {
     console.warn('Error creating engine:', err)
   }
