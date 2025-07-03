@@ -48,7 +48,6 @@ class ExtensionHubSettings extends LitElement {
       taskName: engine_metadata?.taskName || '',
       modelHub: engine_metadata?.modelHub || '',
       modelId: engine_metadata?.modelId || '',
-      engineCreated: engine_metadata?.engineCreated ?? false,
     }
   }
 
@@ -73,10 +72,7 @@ class ExtensionHubSettings extends LitElement {
     const select = event.target as HTMLSelectElement
   }
 
-  handleUpdateEngineMetadata(
-    e: Event,
-    key: keyof Omit<EngineMetadataT, 'engineCreated'>
-  ) {
+  handleUpdateEngineMetadata(e: Event, key: keyof EngineMetadataT) {
     const input = e.target as HTMLInputElement
     this.engineMetadata[key] = input.value
     // Update the engine metadata in

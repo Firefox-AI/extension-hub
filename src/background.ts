@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { MessageTypesT } from '../types'
-import { getOpenAIResponse } from './services/inference'
+import { getOpenAIResponse, getLocalAIResponse } from './services/inference'
 
 /**
  * Get AI response for the given prompt and full text.
@@ -21,6 +21,20 @@ async function generateResponse(data: { prompt: string; fullText: string }) {
   }
 }
 
+async function generateLocalAIResponse(data: {
+  prompt: string
+  fullText: string
+}) {
+  try {
+    const buildPrompt = `answer this question:${data.prompt} with the data provided:${data.fullText}`
+    console.log('Sending prompt to local AI engine:')
+    const result = await getLocalAIResponse(buildPrompt)
+    return result
+  } catch (err) {
+    console.warn('Error generating local AI response:', err)
+  }
+}
+
 /**
  * Event Listeners
  */
@@ -31,6 +45,15 @@ browser.runtime.onMessage.addListener(
 
       browser.runtime.sendMessage({
         type: 'ai_result',
+        result: result,
+      })
+    }
+
+    if (message.type === 'page_summarize') {
+      const result = await generateLocalAIResponse(message.data)
+
+      browser.runtime.sendMessage({
+        type: 'page_summarize_result',
         result: result,
       })
     }

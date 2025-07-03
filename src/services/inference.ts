@@ -1,5 +1,5 @@
-import { mlBrowserT, PromptDataT } from '../../types'
-import { LocalStorageKeys } from '../../const'
+import { EngineMetadataT, mlBrowserT } from '../../types'
+import { LocalStorageKeys, SessionStorageKeys } from '../../const'
 
 export const getOpenAIResponse = async (prompt: string) => {
   try {
@@ -41,17 +41,17 @@ export const getOpenAIResponse = async (prompt: string) => {
  * store a boolean in session storage.
  */
 const ensureEngineIsReady = async () => {
-  const { engineCreated } = await browser.storage.session.get({
-    engineCreated: false,
-  })
-  console.log('trying to Creating engine...')
+  const { engineCreated } = await browser.storage.session.get(
+    SessionStorageKeys.ENGINE_CREATED
+  )
+  const engineMetadata: EngineMetadataT = (
+    await browser.storage.local.get(LocalStorageKeys.ENGINE_METADATA)
+  ).engine_metadata
 
+  console.log('trying to Creating engine...')
   if (engineCreated) return
   console.log('Creating engine...')
   try {
-    const engineMetadata = await browser.storage.session.get(
-      LocalStorageKeys.ENGINE_METADATA
-    )
     const trial = (browser as unknown as mlBrowserT).trial
 
     // TODO consider better defaults
@@ -61,14 +61,15 @@ const ensureEngineIsReady = async () => {
       modelId: engineMetadata.modelId || 'Xenova/distilbart-cnn-6-6',
     })
     // Set the engineCreated flag to true
-    engineMetadata.engineCreated = true
-    await browser.storage.session.set({ engine_metadata: engineMetadata })
+    await browser.storage.session.set({
+      [SessionStorageKeys.ENGINE_CREATED]: true,
+    })
   } catch (err) {
     console.warn('Error creating engine:', err)
   }
 }
 
-export const generateLocalAIResponse = async (prompt: string) => {
+export const getLocalAIResponse = async (prompt: string) => {
   try {
     await ensureEngineIsReady()
     const trial = (browser as unknown as mlBrowserT).trial

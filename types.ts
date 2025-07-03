@@ -8,7 +8,11 @@ export type mlBrowserT = {
   }
 }
 
-export type MessageTypesT = 'analyze_page' | 'ai_result'
+export type MessageTypesT =
+  | 'analyze_page'
+  | 'ai_result'
+  | 'page_summarize'
+  | 'page_summarize_result'
 
 export type PromptDataT = {
   prompt: string
@@ -19,5 +23,4 @@ export type EngineMetadataT = {
   taskName: string
   modelHub: string
   modelId: string
-  engineCreated?: boolean
 }

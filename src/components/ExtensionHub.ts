@@ -1,7 +1,8 @@
 import { LitElement, html } from 'lit'
+import { LocalStorageKeys } from '../../const'
 
 type FeatureOption = {
-  value: string
+  value: 'page_qa' | 'page-summarization' | 'other_feature'
   label: string
   component: () => unknown
 }
@@ -13,9 +14,9 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     component: () => html`<moz-question-answer></moz-question-answer>`,
   },
   {
-    value: 'chat',
-    label: 'Chat',
-    component: () => html`<moz-chat></moz-chat>`,
+    value: 'page-summarization',
+    label: 'Page Summarization',
+    component: () => html`<moz-page-summarization></moz-page-summarization>`,
   },
   {
     value: 'other_feature',
@@ -39,9 +40,23 @@ class MozExtensionHub extends LitElement {
     return this
   }
 
-  handleSelectChange(event: Event) {
+  async firstUpdated() {
+    this.initLocalStorageData()
+  }
+
+  async initLocalStorageData() {
+    const { current_feature } = await browser.storage.local.get([
+      LocalStorageKeys.CURRENT_FEATURE,
+    ])
+    this.feature = current_feature || FEATURE_OPTIONS[0].value
+  }
+
+  async handleSelectChange(event: Event) {
     const select = event.target as HTMLSelectElement
     this.feature = select.value
+    await browser.storage.local.set({
+      [LocalStorageKeys.CURRENT_FEATURE]: this.feature,
+    })
   }
 
   handleSettingsClick() {
