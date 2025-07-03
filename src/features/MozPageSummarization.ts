@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit'
+import { ContextMenuIds } from '../contextMenu'
 
 class MozPageSummarization extends LitElement {
   prompt: string = ''
@@ -106,6 +107,15 @@ class MozPageSummarization extends LitElement {
   connectedCallback() {
     super.connectedCallback()
     browser.runtime.onMessage.addListener(this.handleIncomingMessage)
+
+    // TODO summarize selected text
+    browser.menus.onClicked.addListener(async (info, tab) => {
+      if (info.menuItemId !== ContextMenuIds.TEXT_SELECTION_SUMMARIZATION)
+        return
+      console.log(
+        `Context menu clicked:${info.selectionText} in tab ${tab?.url}`
+      )
+    })
   }
 
   disconnectedCallback() {

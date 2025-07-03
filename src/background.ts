@@ -4,6 +4,7 @@
 
 import { MessageTypesT } from '../types'
 import { getOpenAIResponse, getLocalAIResponse } from './services/inference'
+import initConextMenus from './contextMenu'
 
 /**
  * Get AI response for the given prompt and full text.
@@ -35,6 +36,9 @@ async function generateLocalAIResponse(data: {
   }
 }
 
+// Request permissions for trialML API
+;(browser.permissions.request as any)({ permissions: ['trialML'] })
+
 /**
  * Event Listeners
  */
@@ -59,3 +63,6 @@ browser.runtime.onMessage.addListener(
     }
   }
 )
+
+// Initialize context menus
+initConextMenus()
