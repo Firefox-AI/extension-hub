@@ -4,6 +4,8 @@ export enum LocalStorageKeys {
   ENGINE_METADATA = 'engine_metadata',
   ENGINE_CREATED = 'engine_created',
   CURRENT_FEATURE = 'current_feature',
+  TOGETHERAI_API_KEY = 'togetherai_api_key',
+  TOGETHERAI_MODEL = 'togetherai_model',
 }
 
 export enum SessionStorageKeys {

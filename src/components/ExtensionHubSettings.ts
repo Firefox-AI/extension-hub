@@ -3,10 +3,13 @@ import { LocalStorageKeys } from '../../const'
 import { EngineMetadataT } from '../../types'
 
 const defaultOpenAiModel = 'gpt-4o'
+const defaultTogetherAiModel = 'deepseek-ai/DeepSeek-V3'
 class ExtensionHubSettings extends LitElement {
   loading: boolean = false
-  apikey: string = ''
-  aiModel: string = defaultOpenAiModel
+  openAiApikey: string = ''
+  openAiModel: string = defaultOpenAiModel
+  togetherAiApiKey: string = ''
+  togetherAiModel: string = defaultTogetherAiModel
   source: 'openai' | 'local' = 'openai'
   engineMetadata: EngineMetadataT = {
     taskName: '',
@@ -16,8 +19,10 @@ class ExtensionHubSettings extends LitElement {
 
   static properties = {
     feature: { type: String },
-    apikey: { type: String },
-    aiModel: { type: String },
+    openAiApikey: { type: String },
+    openAiModel: { type: String },
+    togetherAiApikey: { type: String },
+    togeatherAiModel: { type: String },
     engineMetadata: { type: Object },
     source: { type: String },
   }
@@ -41,30 +46,18 @@ class ExtensionHubSettings extends LitElement {
         LocalStorageKeys.OPENAI_API_KEY,
         LocalStorageKeys.OPENAI_AI_MODEL,
         LocalStorageKeys.ENGINE_METADATA,
+        LocalStorageKeys.TOGETHERAI_API_KEY,
+        LocalStorageKeys.TOGETHERAI_MODEL,
       ])
-    this.apikey = openai_api_key || ''
-    this.aiModel = openai_ai_model || defaultOpenAiModel
+    this.openAiApikey = openai_api_key || ''
+    this.openAiModel = openai_ai_model || defaultOpenAiModel
+    this.togetherAiApiKey = openai_api_key || ''
+    this.togetherAiModel = openai_ai_model || defaultTogetherAiModel
     this.engineMetadata = {
       taskName: engine_metadata?.taskName || '',
       modelHub: engine_metadata?.modelHub || '',
       modelId: engine_metadata?.modelId || '',
     }
-  }
-
-  handleApiKeyInput(event: Event) {
-    const input = event.target as HTMLSelectElement
-    browser.storage.local.set({ openai_api_key: input.value })
-    this.apikey = input.value
-  }
-
-  handleAiModelInput(event: Event) {
-    const input = event.target as HTMLSelectElement
-    browser.storage.local.set({ openai_ai_model: input.value })
-    this.aiModel = input.value
-  }
-
-  handleSettingsClick() {
-    browser.runtime.openOptionsPage()
   }
 
   handleSourceSelectChange(event: Event) {
@@ -79,6 +72,37 @@ class ExtensionHubSettings extends LitElement {
     browser.storage.local.set({
       engine_metadata: this.engineMetadata,
     })
+  }
+
+  /**
+   * OPENAI SETTINGS
+   */
+
+  handleOpenAiApiKeyInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ openai_api_key: input.value })
+    this.openAiApikey = input.value
+  }
+
+  handleOpenAiModelInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ openai_ai_model: input.value })
+    this.openAiModel = input.value
+  }
+
+  /**
+   * TOGETHERAI SETTINGS
+   */
+  handleTogetherAIApiKeyInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ togetherai_api_key: input.value })
+    this.togetherAiApiKey = input.value
+  }
+
+  handleTogetherAiModelInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ togetherai_model: input.value })
+    this.togetherAiModel = input.value
   }
 
   render() {
@@ -113,8 +137,8 @@ class ExtensionHubSettings extends LitElement {
                 type="password"
                 placeholder="OpenAI API Key"
                 class="text-input"
-                value="${this.apikey || ''}"
-                @input="${this.handleApiKeyInput}"
+                value="${this.openAiApikey || ''}"
+                @input="${this.handleOpenAiApiKeyInput}"
               />
             </div>
             <div>
@@ -123,8 +147,34 @@ class ExtensionHubSettings extends LitElement {
                 type="text"
                 placeholder="Valid OpenAI model name"
                 class="text-input"
-                value="${this.aiModel || ''}"
-                @input="${this.handleAiModelInput}"
+                value="${this.openAiModel || ''}"
+                @input="${this.handleOpenAiModelInput}"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Together AI</h3>
+          <div class="fields">
+            <div>
+              <label class="label">API Key</label>
+              <input
+                type="password"
+                placeholder="Together AI API Key"
+                class="text-input"
+                value="${this.togetherAiApiKey || ''}"
+                @input="${this.handleTogetherAIApiKeyInput}"
+              />
+            </div>
+            <div>
+              <label class="label">AI Model</label>
+              <input
+                type="text"
+                placeholder="Valid Together AI model name"
+                class="text-input"
+                value="${this.togetherAiModel || ''}"
+                @input="${this.handleTogetherAiModelInput}"
               />
             </div>
           </div>

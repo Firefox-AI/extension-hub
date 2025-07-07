@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit'
 import { ContextMenuIds } from '../contextMenu'
+import { marked } from 'marked'
 
 class MozPageSummarization extends LitElement {
   prompt: string = ''
@@ -75,6 +76,15 @@ class MozPageSummarization extends LitElement {
       cursor: pointer;
     }
 
+    .response {
+      background-color: var(--color-response-bg);
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      overflow-y: auto;
+      flex-grow: 1;
+    }
+
     @keyframes pulse {
       0% {
         background-color: var(--color-loader-bg);
@@ -123,11 +133,12 @@ class MozPageSummarization extends LitElement {
     super.disconnectedCallback()
   }
 
-  handleIncomingMessage = (message: any) => {
+  handleIncomingMessage = async (message: any) => {
     if (message.type === 'page_summarize_result') {
       console.log('Sidebar got AI result:', message.result)
+      const formattedResponse = await marked.parse(message.result)
       this.loading = false
-      this.response = message.result[0].summary_text || ''
+      this.response = formattedResponse
       if (!this.response) {
         this.response = 'No response received. Please try again.'
       }
@@ -169,7 +180,7 @@ class MozPageSummarization extends LitElement {
             : ''}
           ${!this.loading && this.response
             ? html`<div class="response">
-                <p>${this.response}</p>
+                <p .innerHTML=${this.response}></p>
               </div>`
             : ''}
 

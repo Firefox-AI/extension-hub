@@ -3,7 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { MessageTypesT } from '../types'
-import { getOpenAIResponse, getLocalAIResponse } from './services/inference'
+import { getOpenAIResponse } from './services/openai'
+import { getLocalAIResponse } from './services/mlEngine'
+import { getTogeatherAIResponse } from './services/togetherai'
 import initConextMenus from './contextMenu'
 
 /**
@@ -11,42 +13,21 @@ import initConextMenus from './contextMenu'
  * @param data
  * @returns
  */
-async function generateResponse(data: { prompt: string; fullText: string }) {
-  try {
-    const buildPrompt = `answer this question:${data.prompt}, with this data :${data.fullText}`
-    console.log('Sending prompt to OpenAI:')
-    const result = await getOpenAIResponse(buildPrompt)
-    return result
-  } catch (err) {
-    console.warn('Error generating response:', err)
-  }
-}
 
-async function generateLocalAIResponse(data: {
-  prompt: string
-  fullText: string
-}) {
-  try {
-    const buildPrompt = `answer this question:${data.prompt} with the data provided:${data.fullText}`
-    console.log('Sending prompt to local AI engine:')
-    const result = await getLocalAIResponse(buildPrompt)
-    return result
-  } catch (err) {
-    console.warn('Error generating local AI response:', err)
-  }
+const buildPrompt = (prompt: string, fullText: string) => {
+  return `answer this question:${prompt}, with this data :${fullText}`
 }
-
-// Request permissions for trialML API
-;(browser.permissions.request as any)({ permissions: ['trialML'] })
 
 /**
  * Event Listeners
  */
 browser.runtime.onMessage.addListener(
   async (message: { type: MessageTypesT; data: any }) => {
-    if (message.type === 'analyze_page') {
-      const result = await generateResponse(message.data)
+    // TODO - probably need to diversify prompts based on type of request
+    const prompt = buildPrompt(message.data.prompt, message.data.fullText)
 
+    if (message.type === 'analyze_page') {
+      const result = await getOpenAIResponse(prompt)
       browser.runtime.sendMessage({
         type: 'ai_result',
         result: result,
@@ -54,8 +35,7 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'page_summarize') {
-      const result = await generateLocalAIResponse(message.data)
-
+      const result = await getTogeatherAIResponse(prompt)
       browser.runtime.sendMessage({
         type: 'page_summarize_result',
         result: result,
