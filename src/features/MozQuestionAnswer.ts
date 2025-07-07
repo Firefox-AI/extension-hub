@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit'
+import { LocalStorageKeys } from '../../const'
 
 class MozQuestionAnswer extends LitElement {
   prompt: string = ''
@@ -12,6 +13,7 @@ class MozQuestionAnswer extends LitElement {
   static properties = {
     prompt: { type: String },
     loading: { type: Boolean },
+    response: { type: String },
   }
 
   static styles = css`
@@ -148,6 +150,16 @@ class MozQuestionAnswer extends LitElement {
 
   constructor() {
     super()
+    this.initData()
+  }
+
+  async initData() {
+    const storedData = await browser.storage.local.get(
+      LocalStorageKeys.LAST_QUESTION_ANSWER
+    )
+    if (storedData.last_question_answer) {
+      this.response = storedData.last_question_answer
+    }
   }
 
   connectedCallback() {
@@ -165,6 +177,9 @@ class MozQuestionAnswer extends LitElement {
       console.log('Sidebar got AI result:', message.result)
       this.loading = false
       this.response = message.result
+      browser.storage.local.set({
+        [LocalStorageKeys.LAST_QUESTION_ANSWER]: this.response,
+      })
     }
   }
 

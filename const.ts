@@ -6,6 +6,8 @@ export enum LocalStorageKeys {
   CURRENT_FEATURE = 'current_feature',
   TOGETHERAI_API_KEY = 'togetherai_api_key',
   TOGETHERAI_MODEL = 'togetherai_model',
+  LAST_PAGE_SUMMARIZATION = 'last_page_summarization',
+  LAST_QUESTION_ANSWER = 'last_question_answer',
 }
 
 export enum SessionStorageKeys {

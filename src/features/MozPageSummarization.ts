@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit'
 import { ContextMenuIds } from '../contextMenu'
 import { marked } from 'marked'
+import { LocalStorageKeys } from '../../const'
 
 class MozPageSummarization extends LitElement {
   prompt: string = ''
@@ -10,6 +11,7 @@ class MozPageSummarization extends LitElement {
   static properties = {
     prompt: { type: String },
     loading: { type: Boolean },
+    response: { type: String },
   }
 
   static styles = css`
@@ -112,6 +114,16 @@ class MozPageSummarization extends LitElement {
 
   constructor() {
     super()
+    this.initData()
+  }
+
+  async initData() {
+    const storedData = await browser.storage.local.get(
+      LocalStorageKeys.LAST_PAGE_SUMMARIZATION
+    )
+    if (storedData.last_page_summarization) {
+      this.response = storedData.last_page_summarization
+    }
   }
 
   connectedCallback() {
@@ -139,9 +151,11 @@ class MozPageSummarization extends LitElement {
       const formattedResponse = await marked.parse(message.result)
       this.loading = false
       this.response = formattedResponse
-      if (!this.response) {
-        this.response = 'No response received. Please try again.'
-      }
+        ? formattedResponse
+        : 'No response received. Please try again.'
+      browser.storage.local.set({
+        [LocalStorageKeys.LAST_PAGE_SUMMARIZATION]: this.response,
+      })
     }
   }
 
