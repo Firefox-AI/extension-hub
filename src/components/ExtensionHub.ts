@@ -2,7 +2,7 @@ import { LitElement, html } from 'lit'
 import { LocalStorageKeys } from '../../const'
 
 type FeatureOption = {
-  value: 'page_qa' | 'page-summarization' | 'other_feature'
+  value: 'page_qa' | 'page_summarization' | 'tab_summarization'
   label: string
   component: () => unknown
 }
@@ -14,14 +14,15 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     component: () => html`<moz-question-answer></moz-question-answer>`,
   },
   {
-    value: 'page-summarization',
+    value: 'page_summarization',
     label: 'Page Summarization',
     component: () => html`<moz-page-summarization></moz-page-summarization>`,
   },
+
   {
-    value: 'other_feature',
-    label: 'Other Feature',
-    component: () => html`<div>Example : Other feature content goes here</div>`,
+    value: 'tab_summarization',
+    label: 'Tabs Summarization',
+    component: () => html`<moz-tabs></moz-tabs>`,
   },
 ]
 

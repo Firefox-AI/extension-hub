@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "An extension hub to prototype and test various ideas.",
   "optional_permissions": ["trialML"],
-  "permissions": ["<all_urls>", "menus", "scripting", "storage","activeTab"],
+  "permissions": ["<all_urls>", "menus", "scripting", "storage","activeTab","history"],
   "icons": {
     "64": "assets/icon.svg"
   },

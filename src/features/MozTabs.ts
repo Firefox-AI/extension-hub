@@ -1,15 +1,12 @@
 import { LitElement, html, css } from 'lit'
-import { LocalStorageKeys } from '../../const'
+import { ContextMenuIds } from '../contextMenu'
 import { marked } from 'marked'
+import { LocalStorageKeys } from '../../const'
 
-class MozQuestionAnswer extends LitElement {
+class MozTabs extends LitElement {
   prompt: string = ''
   loading: boolean = false
   response: string = ''
-  exampleQuestions = [
-    'Can you define all the key words here?',
-    'Can you summarize the content?',
-  ]
 
   static properties = {
     prompt: { type: String },
@@ -22,6 +19,7 @@ class MozQuestionAnswer extends LitElement {
       --color-bg: #202020;
       --color-fg: #ffffff;
       --color-border: #007bff;
+      --color-link: #1e90ff;
       --color-input-bg: #424242;
       --color-secondary-hover: #585858;
       --color-loader-bg: #424242;
@@ -29,6 +27,14 @@ class MozQuestionAnswer extends LitElement {
       --color-gradient-start: #2e3133;
       --color-gradient-end: #4b4e52;
       --color-primary-hover: #0056b3;
+    }
+
+    a {
+      color: var(--color-link);
+    }
+
+    p {
+      line-height: 24px;
     }
 
     .wrapper {
@@ -52,11 +58,9 @@ class MozQuestionAnswer extends LitElement {
       border-radius: 8px;
       font-size: 14px;
     }
-
-    .title {
-      font-size: 16px;
-      font-weight: 300;
-      margin-bottom: 0;
+    .fields {
+      display: flex;
+      flex-direction: column;
     }
 
     .text-input {
@@ -68,6 +72,12 @@ class MozQuestionAnswer extends LitElement {
       color: var(--color-fg);
     }
 
+    .label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
     .primary-button {
       padding: 8px 12px;
       background-color: var(--color-border);
@@ -77,34 +87,13 @@ class MozQuestionAnswer extends LitElement {
       cursor: pointer;
     }
 
-    .primary-button:hover {
-      background-color: var(--color-primary-hover);
-    }
-
-    .secondary-button {
-      padding: 8px 12px;
-      color: var(--color-fg);
-      border: 1px solid var(--color-fg);
+    .response {
+      background-color: var(--color-response-bg);
+      padding: 10px;
       border-radius: 4px;
-      cursor: pointer;
-      background-color: transparent;
-    }
-
-    .secondary-button:hover {
-      background-color: var(--color-secondary-hover);
-    }
-
-    .example-buttons {
-      display: flex;
-      gap: 8px;
-      flex-direction: column;
-      margin-bottom: 20px;
-    }
-
-    .label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
+      margin-bottom: 10px;
+      overflow-y: auto;
+      flex-grow: 1;
     }
 
     @keyframes pulse {
@@ -128,24 +117,7 @@ class MozQuestionAnswer extends LitElement {
       border-radius: 4px;
       color: var(--color-fg);
       animation: pulse 1.5s infinite;
-    }
-
-    .response {
       margin-bottom: 10px;
-      padding: 0 12px;
-      background-color: var(--color-response-bg);
-      border-radius: 4px;
-      color: var(--color-fg);
-      overflow-y: auto;
-      flex-grow: 1;
-      line-height: 1.5;
-      max-height: 100%;
-    }
-
-    hr {
-      border: none;
-      border-top: 1px solid var(--color-secondary-hover);
-      margin: 20px 0;
     }
   `
 
@@ -156,16 +128,25 @@ class MozQuestionAnswer extends LitElement {
 
   async initData() {
     const storedData = await browser.storage.local.get(
-      LocalStorageKeys.LAST_QUESTION_ANSWER
+      LocalStorageKeys.LAST_TAB_SUMMARIZATION
     )
-    if (storedData.last_question_answer) {
-      this.response = storedData.last_question_answer
+    if (storedData.last_tab_summarization) {
+      this.response = storedData.last_tab_summarization
     }
   }
 
   connectedCallback() {
     super.connectedCallback()
     browser.runtime.onMessage.addListener(this.handleIncomingMessage)
+
+    // TODO summarize selected text
+    browser.menus.onClicked.addListener(async (info, tab) => {
+      if (info.menuItemId !== ContextMenuIds.TEXT_SELECTION_SUMMARIZATION)
+        return
+      console.log(
+        `Context menu clicked:${info.selectionText} in tab ${tab?.url}`
+      )
+    })
   }
 
   disconnectedCallback() {
@@ -174,14 +155,29 @@ class MozQuestionAnswer extends LitElement {
   }
 
   handleIncomingMessage = async (message: any) => {
-    if (message.type !== 'ai_result') return
+    if (message.type !== 'tab_summarize_result') return
+
     const formattedResponse = await marked.parse(message.result)
     this.loading = false
     this.response = formattedResponse
       ? formattedResponse
       : 'No response received. Please try again.'
     browser.storage.local.set({
-      [LocalStorageKeys.LAST_QUESTION_ANSWER]: this.response,
+      [LocalStorageKeys.LAST_TAB_SUMMARIZATION]: this.response,
+    })
+  }
+
+  handlePromptSubmit(prompt: string) {
+    if (!this.prompt) {
+      alert('Please enter a question to submit.')
+      return
+    }
+    this.loading = true
+    browser.runtime.sendMessage({
+      type: 'tab_summarize',
+      data: {
+        prompt: this.prompt,
+      },
     })
   }
 
@@ -190,47 +186,12 @@ class MozQuestionAnswer extends LitElement {
     this.prompt = input.value
   }
 
-  handlePromptSubmit(prompt: string) {
-    browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-      if (tab?.id) {
-        browser.tabs.sendMessage(tab.id, {
-          type: 'user_prompt',
-          prompt,
-        })
-      }
-    })
-  }
-
-  handleSubmit() {
-    if (!this.prompt) {
-      alert('Please enter a question to submit.')
-      return
-    }
-    this.loading = true
-    this.handlePromptSubmit(this.prompt)
-  }
-
   render() {
     return html`
       <div class="wrapper">
         <div class="container">
-          <h3 class="title">Ask a question about this page</h3>
-          <hr />
-          <div class="example-buttons">
-            ${this.exampleQuestions.map(
-              (question) => html`
-                <button
-                  class="secondary-button"
-                  @click="${() => {
-                    this.prompt = question
-                    this.handleSubmit()
-                  }}"
-                >
-                  ${question}
-                </button>
-              `
-            )}
-          </div>
+          <h3 class="title">Tab Summarization</h3>
+
           ${this.loading
             ? html`<div class="loader">
                 <span>Getting your answer...</span>
@@ -242,15 +203,14 @@ class MozQuestionAnswer extends LitElement {
               </div>`
             : ''}
 
-          <hr />
-          <input
-            class="text-input"
-            type="text"
-            placeholder="what do you want to know?"
-            @input="${this.handleInput}"
-            .value="${this.prompt}"
-          />
-          <button @click="${this.handleSubmit}" class="primary-button">
+          <div class="fields">
+            <label class="label">Enter Prompt</label>
+            <textarea
+              @input="${this.handleInput}"
+              class="text-input"
+            ></textarea>
+          </div>
+          <button @click="${this.handlePromptSubmit}" class="primary-button">
             Ask
           </button>
         </div>
@@ -259,4 +219,4 @@ class MozQuestionAnswer extends LitElement {
   }
 }
 
-export default MozQuestionAnswer
+export default MozTabs

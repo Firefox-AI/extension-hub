@@ -18,6 +18,23 @@ const buildPrompt = (prompt: string, fullText: string) => {
   return `answer this question:${prompt}, with this data :${fullText}`
 }
 
+const summarizeTabs = async (prompt: string) => {
+  // Dive more into the conifguration options here:
+  const items = await browser.history.search({
+    text: '',
+    startTime: 0,
+    maxResults: 200,
+  })
+
+  const formattedPrompt = `Use the following data of recently used tabs : ${JSON.stringify(
+    items
+  )} to answer the following prompt: ${prompt}.`
+
+  // You can switch between different AI services here
+  // return getOpenAIResponse(formattedPrompt)
+  return getTogeatherAIResponse(formattedPrompt)
+}
+
 /**
  * Event Listeners
  */
@@ -27,7 +44,7 @@ browser.runtime.onMessage.addListener(
     const prompt = buildPrompt(message.data.prompt, message.data.fullText)
 
     if (message.type === 'analyze_page') {
-      const result = await getOpenAIResponse(prompt)
+      const result = await getTogeatherAIResponse(prompt)
       browser.runtime.sendMessage({
         type: 'ai_result',
         result: result,
@@ -38,6 +55,14 @@ browser.runtime.onMessage.addListener(
       const result = await getTogeatherAIResponse(prompt)
       browser.runtime.sendMessage({
         type: 'page_summarize_result',
+        result: result,
+      })
+    }
+
+    if (message.type === 'tab_summarize') {
+      const result = await summarizeTabs(prompt)
+      browser.runtime.sendMessage({
+        type: 'tab_summarize_result',
         result: result,
       })
     }

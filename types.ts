@@ -13,6 +13,8 @@ export type MessageTypesT =
   | 'ai_result'
   | 'page_summarize'
   | 'page_summarize_result'
+  | 'tab_summarize'
+  | 'tab_summarize_result'
 
 export type PromptDataT = {
   prompt: string
