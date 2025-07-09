@@ -4,9 +4,11 @@
 
 import { MessageTypesT } from '../types'
 import { getOpenAIResponse } from './services/openai'
-import { getLocalAIResponse } from './services/mlEngine'
+import { getMlEngineAIResponse } from './services/mlEngine'
+import { getLocalModelResponse } from './services/localModel'
 import { getTogeatherAIResponse } from './services/togetherai'
 import initContextMenus from './contextMenu'
+import { summarizeTabs } from './services/browserHistory'
 
 browser.runtime.onInstalled.addListener(() => {
   browser.menus.removeAll().then(() => {
@@ -23,23 +25,6 @@ browser.runtime.onInstalled.addListener(() => {
 
 const buildPrompt = (prompt: string, fullText: string) => {
   return `answer this question:${prompt}, with this data :${fullText}`
-}
-
-const summarizeTabs = async (prompt: string) => {
-  // Dive more into the conifguration options here:
-  const items = await browser.history.search({
-    text: '',
-    startTime: 0,
-    maxResults: 200,
-  })
-
-  const formattedPrompt = `Use the following data of recently used tabs : ${JSON.stringify(
-    items
-  )} to answer the following prompt: ${prompt}.`
-
-  // You can switch between different AI services here
-  // return getOpenAIResponse(formattedPrompt)
-  return getTogeatherAIResponse(formattedPrompt)
 }
 
 /**
@@ -59,8 +44,8 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'page_summarize') {
-      const result = await getLocalAIResponse(prompt)
-      console.log('Page summarize result:', result)
+      // const result = await getMlEngineAIResponse(prompt)
+      const result = await getLocalModelResponse(prompt)
       browser.runtime.sendMessage({
         type: 'page_summarize_result',
         result: result,

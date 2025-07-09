@@ -10,6 +10,8 @@ class ExtensionHubSettings extends LitElement {
   openAiModel: string = defaultOpenAiModel
   togetherAiApiKey: string = ''
   togetherAiModel: string = defaultTogetherAiModel
+  localModelUrl: string = ''
+  localModelName: string = ''
   source: 'openai' | 'local' = 'openai'
   isLocalAiEnabled: boolean = false
   engineMetadata: EngineMetadataT = {
@@ -24,6 +26,8 @@ class ExtensionHubSettings extends LitElement {
     openAiModel: { type: String },
     togetherAiApikey: { type: String },
     togeatherAiModel: { type: String },
+    localModelUrl: { type: String },
+    localModelName: { type: String },
     engineMetadata: { type: Object },
     source: { type: String },
     isLocalAiEnabled: { type: Boolean },
@@ -49,17 +53,23 @@ class ExtensionHubSettings extends LitElement {
       engine_metadata,
       togetherai_api_key,
       togetherai_model,
+      local_model_url,
+      local_model_name,
     } = await browser.storage.local.get([
       LocalStorageKeys.OPENAI_API_KEY,
       LocalStorageKeys.OPENAI_AI_MODEL,
       LocalStorageKeys.ENGINE_METADATA,
       LocalStorageKeys.TOGETHERAI_API_KEY,
       LocalStorageKeys.TOGETHERAI_MODEL,
+      LocalStorageKeys.LOCAL_MODEL_URL,
+      LocalStorageKeys.LOCAL_MODEL_NAME,
     ])
     this.openAiApikey = openai_api_key || ''
     this.openAiModel = openai_ai_model || defaultOpenAiModel
     this.togetherAiApiKey = togetherai_api_key || ''
     this.togetherAiModel = togetherai_model || defaultTogetherAiModel
+    this.localModelUrl = local_model_url || ''
+    this.localModelName = local_model_name || ''
     this.engineMetadata = {
       taskName: engine_metadata?.taskName || '',
       modelHub: engine_metadata?.modelHub || '',
@@ -144,6 +154,21 @@ class ExtensionHubSettings extends LitElement {
     this.togetherAiModel = input.value
   }
 
+  /**
+   * LOCAL MODEL SETTINGS
+   */
+  handleLocalModelUrlInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ local_model_url: input.value })
+    this.localModelUrl = input.value
+  }
+
+  handleLocalModelNameInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ local_model_name: input.value })
+    this.localModelName = input.value
+  }
+
   render() {
     return html`
       <div class="wrapper">
@@ -222,11 +247,50 @@ class ExtensionHubSettings extends LitElement {
         <div class="card">
           <h3>Local Model</h3>
           <p class="info">
+            <i class="fa-solid fa-triangle-exclamation"></i
+            ><span>
+              local models may need additional CORS configuration. If you are
+              using Ollama, please refer to the
+              <a
+                href="https://medium.com/dcoderai/how-to-handle-cors-settings-in-ollama-a-comprehensive-guide-ee2a5a1beef0"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Ollama CORS guide</a
+              >.
+            </span>
+          </p>
+          <div class="fields">
+            <div>
+              <label class="label">URL Endpoint</label>
+              <input
+                type="text"
+                placeholder="Url to your local model endpoint"
+                class="text-input"
+                value="${this.localModelUrl || ''}"
+                @input="${this.handleLocalModelUrlInput}"
+              />
+            </div>
+            <div>
+              <label class="label">Model Name</label>
+              <input
+                type="text"
+                placeholder="Name of your local model"
+                class="text-input"
+                value="${this.localModelName || ''}"
+                @input="${this.handleLocalModelNameInput}"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>ML Engine</h3>
+          <p class="info">
             <i class="fa-solid fa-wrench"></i>This section is under construction
           </p>
           <div class="fields">
             <div class="switch-container">
-              <label class="switch-label">Enable Local AI</label>
+              <label class="switch-label">Enable Local Engine AI</label>
               <label class="switch">
                 <input
                   type="checkbox"

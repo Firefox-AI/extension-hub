@@ -33,6 +33,10 @@ moz-extension-hub-settings {
     padding: 0;
   }
 
+  a {
+    color: var(--color-text);
+  }
+
   .card {
     padding: 12px;
     background-color: var(--color-surface);

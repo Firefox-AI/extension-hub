@@ -35,7 +35,7 @@ const ensureEngineIsReady = async () => {
   }
 }
 
-export const getLocalAIResponse = async (prompt: string) => {
+export const getMlEngineAIResponse = async (prompt: string) => {
   try {
     await ensureEngineIsReady()
     const trial = (browser as unknown as mlBrowserT).trial
