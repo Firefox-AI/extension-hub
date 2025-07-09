@@ -11,6 +11,7 @@ class ExtensionHubSettings extends LitElement {
   togetherAiApiKey: string = ''
   togetherAiModel: string = defaultTogetherAiModel
   source: 'openai' | 'local' = 'openai'
+  isLocalAiEnabled: boolean = false
   engineMetadata: EngineMetadataT = {
     taskName: '',
     modelHub: '',
@@ -25,6 +26,7 @@ class ExtensionHubSettings extends LitElement {
     togeatherAiModel: { type: String },
     engineMetadata: { type: Object },
     source: { type: String },
+    isLocalAiEnabled: { type: Boolean },
   }
 
   constructor() {
@@ -41,28 +43,65 @@ class ExtensionHubSettings extends LitElement {
 
   async initLocalStorageData() {
     console.log('Initializing local storage data...')
-    const { openai_ai_model, openai_api_key, engine_metadata } =
-      await browser.storage.local.get([
-        LocalStorageKeys.OPENAI_API_KEY,
-        LocalStorageKeys.OPENAI_AI_MODEL,
-        LocalStorageKeys.ENGINE_METADATA,
-        LocalStorageKeys.TOGETHERAI_API_KEY,
-        LocalStorageKeys.TOGETHERAI_MODEL,
-      ])
+    const {
+      openai_ai_model,
+      openai_api_key,
+      engine_metadata,
+      togetherai_api_key,
+      togetherai_model,
+    } = await browser.storage.local.get([
+      LocalStorageKeys.OPENAI_API_KEY,
+      LocalStorageKeys.OPENAI_AI_MODEL,
+      LocalStorageKeys.ENGINE_METADATA,
+      LocalStorageKeys.TOGETHERAI_API_KEY,
+      LocalStorageKeys.TOGETHERAI_MODEL,
+    ])
     this.openAiApikey = openai_api_key || ''
     this.openAiModel = openai_ai_model || defaultOpenAiModel
-    this.togetherAiApiKey = openai_api_key || ''
-    this.togetherAiModel = openai_ai_model || defaultTogetherAiModel
+    this.togetherAiApiKey = togetherai_api_key || ''
+    this.togetherAiModel = togetherai_model || defaultTogetherAiModel
     this.engineMetadata = {
       taskName: engine_metadata?.taskName || '',
       modelHub: engine_metadata?.modelHub || '',
       modelId: engine_metadata?.modelId || '',
     }
+    this.isLocalAiEnabled = await browser.permissions.contains({
+      permissions: ['trialML'],
+    })
   }
 
   handleSourceSelectChange(event: Event) {
     // TODO: Implement logic to handle source selection change
     const select = event.target as HTMLSelectElement
+  }
+
+  /**
+   * LOCAL AI (ML Engine) SETTINGS
+   */
+
+  async handleLocalAiEnabledToggleChange(event: Event) {
+    const input = event.target as HTMLInputElement
+    this.isLocalAiEnabled = input.checked
+    // Request permissions for trialML API
+    if (input.checked) {
+      // Request permission
+      ;(browser.permissions.request as any)({ permissions: ['trialML'] }).then(
+        (granted: boolean) => {
+          if (!granted) {
+            console.warn('Permission trialML not granted')
+          }
+        }
+      )
+    } else {
+      // Remove permission
+      ;(browser.permissions.remove as any)({ permissions: ['trialML'] }).then(
+        (removed: boolean) => {
+          if (!removed) {
+            console.warn('Permission trialML could not be removed')
+          }
+        }
+      )
+    }
   }
 
   handleUpdateEngineMetadata(e: Event, key: keyof EngineMetadataT) {
@@ -186,6 +225,17 @@ class ExtensionHubSettings extends LitElement {
             <i class="fa-solid fa-wrench"></i>This section is under construction
           </p>
           <div class="fields">
+            <div class="switch-container">
+              <label class="switch-label">Enable Local AI</label>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  .checked=${this.isLocalAiEnabled}
+                  @change=${this.handleLocalAiEnabledToggleChange}
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
             <div>
               <label class="label">Model Name (ID)</label>
               <input

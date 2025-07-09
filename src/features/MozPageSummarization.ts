@@ -85,6 +85,7 @@ class MozPageSummarization extends LitElement {
       margin-bottom: 10px;
       overflow-y: auto;
       flex-grow: 1;
+      line-height: 24px;
     }
 
     @keyframes pulse {

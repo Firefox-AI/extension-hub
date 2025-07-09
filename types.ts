@@ -6,6 +6,18 @@ export type mlBrowserT = {
       deleteCachedModels: () => Promise<void>
     }
   }
+  tabs: {
+    query: (options: {
+      currentWindow: boolean
+    }) => Promise<Array<{ id?: number; url?: string }>>
+    group: (options: { tabIds: number[] }) => Promise<number>
+  }
+  tabGroups: {
+    update: (
+      id: number,
+      options: { title: string; color: string }
+    ) => Promise<void>
+  }
 }
 
 export type MessageTypesT =

@@ -6,7 +6,14 @@ import { MessageTypesT } from '../types'
 import { getOpenAIResponse } from './services/openai'
 import { getLocalAIResponse } from './services/mlEngine'
 import { getTogeatherAIResponse } from './services/togetherai'
-import initConextMenus from './contextMenu'
+import initContextMenus from './contextMenu'
+
+browser.runtime.onInstalled.addListener(() => {
+  browser.menus.removeAll().then(() => {
+    // Initialize context menus
+    initContextMenus()
+  })
+})
 
 /**
  * Get AI response for the given prompt and full text.
@@ -52,7 +59,8 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'page_summarize') {
-      const result = await getTogeatherAIResponse(prompt)
+      const result = await getLocalAIResponse(prompt)
+      console.log('Page summarize result:', result)
       browser.runtime.sendMessage({
         type: 'page_summarize_result',
         result: result,
@@ -68,6 +76,3 @@ browser.runtime.onMessage.addListener(
     }
   }
 )
-
-// Initialize context menus
-initConextMenus()
