@@ -28,7 +28,7 @@ class MozQuestionAnswer extends LitElement {
       --color-response-bg: #2d2c2c;
       --color-gradient-start: #2e3133;
       --color-gradient-end: #4b4e52;
-      --color-primary-hover: #0056b3;
+      --color-primary-disabled: #6d6d6d;
     }
 
     .wrapper {
@@ -75,10 +75,11 @@ class MozQuestionAnswer extends LitElement {
       border: none;
       border-radius: 4px;
       cursor: pointer;
-    }
 
-    .primary-button:hover {
-      background-color: var(--color-primary-hover);
+      &:disabled {
+        background-color: var(--color-primary-disabled);
+        cursor: not-allowed;
+      }
     }
 
     .secondary-button {
@@ -250,8 +251,12 @@ class MozQuestionAnswer extends LitElement {
             @input="${this.handleInput}"
             .value="${this.prompt}"
           />
-          <button @click="${this.handleSubmit}" class="primary-button">
-            Ask
+          <button
+            @click="${this.handleSubmit}"
+            class="primary-button"
+            .disabled="${this.loading}"
+          >
+            ${this.loading ? 'Loading...' : 'Ask'}
           </button>
         </div>
       </div>

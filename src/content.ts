@@ -24,7 +24,7 @@ const onUserPrompt = (prompt: string) => {
   }
 
   browser.runtime.sendMessage({
-    type: 'analyze_page',
+    type: 'page_qa',
     data: payload,
   })
 }

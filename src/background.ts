@@ -24,7 +24,7 @@ browser.runtime.onInstalled.addListener(() => {
  */
 
 const buildPrompt = (prompt: string, fullText: string) => {
-  return `answer this question:${prompt}, with this data :${fullText}`
+  return `answer this question:${prompt}, from this data :${fullText}`
 }
 
 /**
@@ -35,8 +35,8 @@ browser.runtime.onMessage.addListener(
     // TODO - probably need to diversify prompts based on type of request
     const prompt = buildPrompt(message.data.prompt, message.data.fullText)
 
-    if (message.type === 'analyze_page') {
-      const result = await getTogeatherAIResponse(prompt)
+    if (message.type === 'page_qa') {
+      const result = await getOpenAIResponse(prompt)
       browser.runtime.sendMessage({
         type: 'ai_result',
         result: result,
@@ -44,7 +44,6 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'page_summarize') {
-      // const result = await getMlEngineAIResponse(prompt)
       const result = await getLocalModelResponse(prompt)
       browser.runtime.sendMessage({
         type: 'page_summarize_result',

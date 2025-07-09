@@ -4,7 +4,7 @@ import { marked } from 'marked'
 import { LocalStorageKeys } from '../../const'
 
 class MozPageSummarization extends LitElement {
-  prompt: string = ''
+  prompt: string = 'Can you summarize this page?'
   loading: boolean = false
   response: string = ''
 
@@ -26,6 +26,7 @@ class MozPageSummarization extends LitElement {
       --color-gradient-start: #2e3133;
       --color-gradient-end: #4b4e52;
       --color-primary-hover: #0056b3;
+      --color-primary-disabled: #6d6d6d;
     }
 
     .wrapper {
@@ -76,6 +77,11 @@ class MozPageSummarization extends LitElement {
       border: none;
       border-radius: 4px;
       cursor: pointer;
+
+      &:disabled {
+        background-color: var(--color-primary-disabled);
+        cursor: not-allowed;
+      }
     }
 
     .response {
@@ -148,7 +154,6 @@ class MozPageSummarization extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'page_summarize_result') {
-      console.log('Sidebar got AI result:', message.result)
       const formattedResponse = await marked.parse(message.result)
       this.loading = false
       this.response = formattedResponse
@@ -166,7 +171,6 @@ class MozPageSummarization extends LitElement {
       return
     }
     this.loading = true
-    console.log('Sending prompt to background script:', this.prompt)
     browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
       if (tab?.id) {
         browser.tabs.sendMessage(tab.id, {
@@ -202,12 +206,18 @@ class MozPageSummarization extends LitElement {
           <div class="fields">
             <label class="label">Enter Prompt</label>
             <textarea
+              .value="${this.prompt}"
+              rows="4"
               @input="${this.handleInput}"
               class="text-input"
             ></textarea>
           </div>
-          <button @click="${this.handlePromptSubmit}" class="primary-button">
-            Ask
+          <button
+            @click="${this.handlePromptSubmit}"
+            class="primary-button"
+            .disabled="${this.loading}"
+          >
+            ${this.loading ? 'Loading...' : 'Ask'}
           </button>
         </div>
       </div>
