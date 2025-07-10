@@ -1,17 +1,32 @@
 import { LitElement, html, css } from 'lit'
-import { ContextMenuIds } from '../contextMenu'
+import { ContextMenuIds } from '../../contextMenu'
 import { marked } from 'marked'
-import { LocalStorageKeys } from '../../const'
+import { LocalStorageKeys } from '../../../const'
+import './MozPageSummaryHistory'
+import { CurrentSummaryT, SummaryHistoryItemT } from '../../../types'
 
 class MozPageSummarization extends LitElement {
   prompt: string = 'Can you summarize this page?'
   loading: boolean = false
   response: string = ''
+  currentSummary: CurrentSummaryT = {
+    result: '',
+    prompt: '',
+    url: '',
+    siteName: '',
+  }
+  showHistory: boolean = false
+  showSaveButton: boolean = false
+  history: SummaryHistoryItemT[] = []
 
   static properties = {
     prompt: { type: String },
     loading: { type: Boolean },
     response: { type: String },
+    currentSummary: { type: Object },
+    showHistory: { type: Boolean },
+    history: { type: Array },
+    showSaveButton: { type: Boolean },
   }
 
   static styles = css`
@@ -27,6 +42,7 @@ class MozPageSummarization extends LitElement {
       --color-gradient-end: #4b4e52;
       --color-primary-hover: #0056b3;
       --color-primary-disabled: #6d6d6d;
+      --color-pos-bg: #1f8766;
     }
 
     .wrapper {
@@ -50,6 +66,13 @@ class MozPageSummarization extends LitElement {
       border-radius: 8px;
       font-size: 14px;
     }
+
+    .heading-wrapper {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
     .fields {
       display: flex;
       flex-direction: column;
@@ -68,6 +91,17 @@ class MozPageSummarization extends LitElement {
       display: block;
       margin-bottom: 8px;
       font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .pos-button {
+      background-color: var(--color-pos-bg);
+      color: var(--color-fg);
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+      margin-top: 10px;
     }
 
     .primary-button {
@@ -82,6 +116,16 @@ class MozPageSummarization extends LitElement {
         background-color: var(--color-primary-disabled);
         cursor: not-allowed;
       }
+    }
+
+    .history {
+      background-color: var(--color-response-bg);
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      overflow-y: auto;
+      flex-grow: 1;
+      line-height: 24px;
     }
 
     .response {
@@ -125,12 +169,16 @@ class MozPageSummarization extends LitElement {
   }
 
   async initData() {
-    const storedData = await browser.storage.local.get(
-      LocalStorageKeys.LAST_PAGE_SUMMARIZATION
-    )
-    if (storedData.last_page_summarization) {
-      this.response = storedData.last_page_summarization
-    }
+    const { last_page_summarization, mock_summary_database } =
+      await browser.storage.local.get([
+        LocalStorageKeys.LAST_PAGE_SUMMARIZATION,
+        LocalStorageKeys.MOCK_SUMMARY_DATABASE,
+      ])
+
+    last_page_summarization ? (this.response = last_page_summarization) : ''
+
+    this.history = mock_summary_database || []
+    this.showSaveButton = false
   }
 
   connectedCallback() {
@@ -159,13 +207,20 @@ class MozPageSummarization extends LitElement {
       this.response = formattedResponse
         ? formattedResponse
         : 'No response received. Please try again.'
+      this.showSaveButton = true
       browser.storage.local.set({
         [LocalStorageKeys.LAST_PAGE_SUMMARIZATION]: this.response,
       })
+      this.currentSummary = {
+        result: formattedResponse,
+        prompt: message.prompt,
+        url: message.url,
+        siteName: message.siteName,
+      }
     }
   }
 
-  handlePromptSubmit(prompt: string) {
+  handlePromptSubmit() {
     if (!this.prompt) {
       alert('Please enter a question to submit.')
       return
@@ -186,26 +241,89 @@ class MozPageSummarization extends LitElement {
     this.prompt = input.value
   }
 
+  async handleSaveSummary() {
+    if (!this.currentSummary.result) {
+      alert('No summary available to save.')
+      return
+    }
+
+    const { mock_summary_database } = await browser.storage.local.get(
+      LocalStorageKeys.MOCK_SUMMARY_DATABASE
+    )
+
+    const newSummary: SummaryHistoryItemT = {
+      ...this.currentSummary,
+      date: new Date().toISOString(),
+      id: Date.now().toString(), // Unique ID for the summary
+    }
+
+    const updatedSummaries = [...(mock_summary_database || []), newSummary]
+
+    // Save the summary data to local storage
+    await browser.storage.local.set({
+      [LocalStorageKeys.MOCK_SUMMARY_DATABASE]: updatedSummaries,
+    })
+
+    this.showSaveButton = false
+
+    alert('Summary saved successfully.')
+  }
+
+  async handleToggleHistory() {
+    this.showHistory = !this.showHistory
+    if (this.showHistory) {
+      const { mock_summary_database } = await browser.storage.local.get(
+        LocalStorageKeys.MOCK_SUMMARY_DATABASE
+      )
+      this.history = mock_summary_database || []
+    }
+  }
+
   render() {
     return html`
       <div class="wrapper">
         <div class="container">
-          <h3 class="title">Page Summarization</h3>
+          <div class="heading-wrapper">
+            <h3 class="title">Page Summarization</h3>
+            <button class="primary-button" @click="${this.handleToggleHistory}">
+              ${this.showHistory ? '- History' : '+ History'}
+            </button>
+          </div>
 
           ${this.loading
             ? html`<div class="loader">
                 <span>Getting your answer...</span>
               </div>`
             : ''}
-          ${!this.loading && this.response
-            ? html`<div class="response">
-                <p .innerHTML=${this.response}></p>
-              </div>`
-            : ''}
+          ${this.showHistory
+            ? html`
+                <div class="history">
+                  ${this.history.length === 0
+                    ? html`<p>No summaries found.</p>`
+                    : html`<moz-page-summary-history></moz-page-summary-history>`}
+                </div>
+              `
+            : html` ${
+                !this.loading && this.response
+                  ? html`<div class="response">
+                        <p .innerHTML=${this.response}></p>
+                      </div>
 
-          <div class="fields">
+                      ${this.showSaveButton
+                        ? html`<button
+                            class="pos-button"
+                            @click="${this.handleSaveSummary}"
+                          >
+                            Save Summary
+                          </button>`
+                        : ''}`
+                  : ''
+              }
+                
+                <div class="fields">
             <label class="label">Enter Prompt</label>
             <textarea
+              .disabled="${this.loading}"
               .value="${this.prompt}"
               rows="4"
               @input="${this.handleInput}"
@@ -219,6 +337,8 @@ class MozPageSummarization extends LitElement {
           >
             ${this.loading ? 'Loading...' : 'Ask'}
           </button>
+        </div>
+                `}
         </div>
       </div>
     `

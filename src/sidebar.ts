@@ -1,5 +1,5 @@
 import MozQuestionAnswer from './features/MozQuestionAnswer'
-import MozPageSummarization from './features/MozPageSummarization'
+import MozPageSummarization from './features/page-summarization/MozPageSummarization'
 import MozTabs from './features/MozTabs'
 import ExtensionHub from './components/ExtensionHub'
 

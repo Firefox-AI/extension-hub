@@ -23,8 +23,8 @@ browser.runtime.onInstalled.addListener(() => {
  * @returns
  */
 
-const buildPrompt = (prompt: string, fullText: string) => {
-  return `answer this question:${prompt}, from this data :${fullText}`
+const buildPrompt = (prompt: string, textContent: string) => {
+  return `answer this question:${prompt}, with this data :${textContent}`
 }
 
 /**
@@ -33,7 +33,7 @@ const buildPrompt = (prompt: string, fullText: string) => {
 browser.runtime.onMessage.addListener(
   async (message: { type: MessageTypesT; data: any }) => {
     // TODO - probably need to diversify prompts based on type of request
-    const prompt = buildPrompt(message.data.prompt, message.data.fullText)
+    const prompt = buildPrompt(message.data.prompt, message.data.textContent)
 
     if (message.type === 'page_qa') {
       const result = await getOpenAIResponse(prompt)
@@ -44,10 +44,15 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'page_summarize') {
-      const result = await getLocalModelResponse(prompt)
+      // const result = await getMlEngineAIResponse(prompt)
+      // const result = await getLocalModelResponse(prompt)
+      const result = await getOpenAIResponse(prompt)
       browser.runtime.sendMessage({
         type: 'page_summarize_result',
         result: result,
+        prompt: message.data.prompt,
+        url: message.data.url,
+        siteName: message.data.siteName,
       })
     }
 

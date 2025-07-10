@@ -38,3 +38,15 @@ export type EngineMetadataT = {
   modelHub: string
   modelId: string
 }
+
+export type CurrentSummaryT = {
+  prompt: string
+  result: string
+  url: string
+  siteName: string
+}
+
+export type SummaryHistoryItemT = CurrentSummaryT & {
+  date: string
+  id: string
+}

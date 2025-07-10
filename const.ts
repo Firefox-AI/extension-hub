@@ -17,6 +17,9 @@ export enum LocalStorageKeys {
   // Local Model
   LOCAL_MODEL_URL = 'local_model_url',
   LOCAL_MODEL_NAME = 'local_model_name',
+
+  // Summary Data
+  MOCK_SUMMARY_DATABASE = 'mock_summary_database',
 }
 
 export enum SessionStorageKeys {

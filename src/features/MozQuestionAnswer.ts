@@ -20,6 +20,7 @@ class MozQuestionAnswer extends LitElement {
   static styles = css`
     :host {
       --color-bg: #202020;
+      --color-link: #1e90ff;
       --color-fg: #ffffff;
       --color-border: #007bff;
       --color-input-bg: #424242;
@@ -31,6 +32,9 @@ class MozQuestionAnswer extends LitElement {
       --color-primary-disabled: #6d6d6d;
     }
 
+    a {
+      color: var(--color-link);
+    }
     .wrapper {
       display: block;
       padding: 10px;

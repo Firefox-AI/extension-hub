@@ -32,11 +32,14 @@ const onUserPrompt = (prompt: string) => {
 const onPageSummarizePrompt = (prompt: string) => {
   const article = new Readability(document.cloneNode(true) as Document).parse()
   // TODO make a better check for article validity
+
   if (!article) return
-  const { textContent } = article
+  const { textContent, siteName } = article
   const payload = {
     prompt,
-    fullText: textContent,
+    textContent,
+    siteName,
+    url: window.location.href,
   }
   browser.runtime.sendMessage({
     type: 'page_summarize',
