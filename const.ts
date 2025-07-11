@@ -4,6 +4,10 @@ export enum LocalStorageKeys {
   LAST_PAGE_SUMMARIZATION = 'last_page_summarization',
   LAST_QUESTION_ANSWER = 'last_question_answer',
   LAST_TAB_SUMMARIZATION = 'last_tab_summarization',
+  // Hugging Face
+  HUGGING_FACE_API_KEY = 'hugging_face_api_key',
+  HUGGING_FACE_MODEL = 'hugging_face_model',
+  HUGGING_FACE_PROVIDER = 'hugging_face_provider',
   // OpenAI
   OPENAI_API_KEY = 'openai_api_key',
   OPENAI_AI_MODEL = 'openai_ai_model',

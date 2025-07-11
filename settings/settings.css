@@ -5,7 +5,6 @@
   --color-primary: #007bff;
   --color-border: #ccc;
   --color-text: #ffffff;
-  --color-info: rgb(0, 119, 255);
 }
 
 body {
@@ -83,7 +82,7 @@ moz-extension-hub-settings {
     gap: 12px;
   }
 
-  .info {
+  .info-base {
     margin: 0 0 12px 0;
     display: flex;
     align-items: center;
@@ -93,6 +92,14 @@ moz-extension-hub-settings {
     background-color: var(--color-info);
     padding: 12px;
     border-radius: 8px;
+  }
+
+  .info-primary {
+    --color-info: rgb(0, 119, 255);
+  }
+
+  .info-subtle {
+    --color-info: rgb(7, 69, 140);
   }
 
   .switch {

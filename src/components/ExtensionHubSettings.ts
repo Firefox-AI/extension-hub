@@ -4,8 +4,28 @@ import { EngineMetadataT } from '../../types'
 
 const defaultOpenAiModel = 'gpt-4o'
 const defaultTogetherAiModel = 'deepseek-ai/DeepSeek-V3'
+const huggingFaceProviders = [
+  'auto',
+  'cerebras',
+  'cohere',
+  'fal-ai',
+  'featherless-ai',
+  'fireworks',
+  'groq',
+  'hr-inference',
+  'hyperbolic',
+  'nebius',
+  'novita',
+  'nscale',
+  'replicate',
+  'sambaNova',
+  'together',
+]
 class ExtensionHubSettings extends LitElement {
   loading: boolean = false
+  huggingFaceApiKey: string = ''
+  huggingFaceModel: string = ''
+  huggingFaceProvider: string = ''
   openAiApikey: string = ''
   openAiModel: string = defaultOpenAiModel
   togetherAiApiKey: string = ''
@@ -22,6 +42,9 @@ class ExtensionHubSettings extends LitElement {
 
   static properties = {
     feature: { type: String },
+    huggingFaceApiKey: { type: String },
+    huggingFaceModel: { type: String },
+    huggingFaceProvider: { type: String },
     openAiApikey: { type: String },
     openAiModel: { type: String },
     togetherAiApikey: { type: String },
@@ -48,6 +71,9 @@ class ExtensionHubSettings extends LitElement {
   async initLocalStorageData() {
     console.log('Initializing local storage data...')
     const {
+      hugging_face_api_key,
+      hugging_face_model,
+      hugging_face_provider,
       openai_ai_model,
       openai_api_key,
       engine_metadata,
@@ -56,6 +82,9 @@ class ExtensionHubSettings extends LitElement {
       local_model_url,
       local_model_name,
     } = await browser.storage.local.get([
+      LocalStorageKeys.HUGGING_FACE_API_KEY,
+      LocalStorageKeys.HUGGING_FACE_MODEL,
+      LocalStorageKeys.HUGGING_FACE_PROVIDER,
       LocalStorageKeys.OPENAI_API_KEY,
       LocalStorageKeys.OPENAI_AI_MODEL,
       LocalStorageKeys.ENGINE_METADATA,
@@ -64,6 +93,9 @@ class ExtensionHubSettings extends LitElement {
       LocalStorageKeys.LOCAL_MODEL_URL,
       LocalStorageKeys.LOCAL_MODEL_NAME,
     ])
+    this.huggingFaceApiKey = hugging_face_api_key || ''
+    this.huggingFaceModel = hugging_face_model || ''
+    this.huggingFaceProvider = hugging_face_provider || ''
     this.openAiApikey = openai_api_key || ''
     this.openAiModel = openai_ai_model || defaultOpenAiModel
     this.togetherAiApiKey = togetherai_api_key || ''
@@ -124,6 +156,28 @@ class ExtensionHubSettings extends LitElement {
   }
 
   /**
+   * HUGGING FACE SETTINGS
+   */
+
+  handleHuggingFaceApiKeyInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ hugging_face_api_key: input.value })
+    this.huggingFaceApiKey = input.value
+  }
+
+  handleHuggingFaceModelInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ hugging_face_model: input.value })
+    this.huggingFaceModel = input.value
+  }
+
+  handleHuggingFaceProviderInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ hugging_face_provider: input.value })
+    this.huggingFaceProvider = input.value
+  }
+
+  /**
    * OPENAI SETTINGS
    */
 
@@ -174,7 +228,7 @@ class ExtensionHubSettings extends LitElement {
       <div class="wrapper">
         <div class="card">
           <h3>Inference Source</h3>
-          <p class="info">
+          <p class="info-base info-primary">
             <i class="fa-solid fa-wrench"></i>This section is under construction
           </p>
           <div class="fields">
@@ -189,6 +243,54 @@ class ExtensionHubSettings extends LitElement {
                 </option>
               </select>
             </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Hugging Face</h3>
+          <div class="fields">
+            <div>
+              <label class="label">API Key</label>
+              <input
+                type="password"
+                placeholder="Hugging Face API Key"
+                class="text-input"
+                value="${this.huggingFaceApiKey || ''}"
+                @input="${this.handleHuggingFaceApiKeyInput}"
+              />
+            </div>
+            <div class="select-container">
+              <label class="label">Hugging Face Provider</label>
+              <select
+                class="select"
+                @change="${this.handleHuggingFaceProviderInput}"
+              >
+                ${huggingFaceProviders.map(
+                  (provider) => html`
+                    <option
+                      value="${provider}"
+                      ?selected=${this.huggingFaceProvider === provider}
+                    >
+                      ${provider}
+                    </option>
+                  `
+                )}
+              </select>
+              <p class="info-base info-subtle">
+                <i class="fa-solid fa-circle-info"></i>Select "auto" for
+                huggingface to select provider for you.
+              </p>
+            </div>
+          </div>
+          <div>
+            <label class="label">AI Model</label>
+            <input
+              type="text"
+              placeholder="Valid Hugging Face model name"
+              class="text-input"
+              value="${this.huggingFaceModel || ''}"
+              @input="${this.handleHuggingFaceModelInput}"
+            />
           </div>
         </div>
 
@@ -246,7 +348,7 @@ class ExtensionHubSettings extends LitElement {
 
         <div class="card">
           <h3>Local Model</h3>
-          <p class="info">
+          <p class="info-base info-primary">
             <i class="fa-solid fa-triangle-exclamation"></i
             ><span>
               local models may need additional CORS configuration. If you are
@@ -285,7 +387,7 @@ class ExtensionHubSettings extends LitElement {
 
         <div class="card">
           <h3>ML Engine</h3>
-          <p class="info">
+          <p class="info-base info-primary">
             <i class="fa-solid fa-wrench"></i>This section is under construction
           </p>
           <div class="fields">
