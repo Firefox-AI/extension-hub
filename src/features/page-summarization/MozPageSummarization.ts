@@ -5,6 +5,17 @@ import { LocalStorageKeys } from '../../../const'
 import './MozPageSummaryHistory'
 import { CurrentSummaryT, SummaryHistoryItemT } from '../../../types'
 
+const PROMPT_OPTIONS = [
+  'Can you summarize this page?',
+  'What are the key points of this article?',
+  'Can you explain the main concepts in simple terms?',
+  "What is the author's main argument?",
+  'Can you provide a brief overview of this content?',
+  'What are the most important details in this text?',
+  'Can you highlight the main findings of this research?',
+  'What are the key takeaways from this document?',
+]
+
 class MozPageSummarization extends LitElement {
   prompt: string = 'Can you summarize this page?'
   loading: boolean = false
@@ -18,6 +29,7 @@ class MozPageSummarization extends LitElement {
   showHistory: boolean = false
   showSaveButton: boolean = false
   history: SummaryHistoryItemT[] = []
+  showBank: boolean = false
 
   static properties = {
     prompt: { type: String },
@@ -27,12 +39,14 @@ class MozPageSummarization extends LitElement {
     showHistory: { type: Boolean },
     history: { type: Array },
     showSaveButton: { type: Boolean },
+    showBank: { type: Boolean },
   }
 
   static styles = css`
     :host {
       --color-bg: #202020;
       --color-fg: #ffffff;
+      --color-fg-subtle: #b0b0b0;
       --color-border: #007bff;
       --color-input-bg: #424242;
       --color-secondary-hover: #585858;
@@ -118,6 +132,15 @@ class MozPageSummarization extends LitElement {
       }
     }
 
+    .outline-button {
+      padding: 8px 12px;
+      color: var(--color-fg);
+      border: 1px solid var(--color-fg);
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: transparent;
+    }
+
     .history {
       background-color: var(--color-response-bg);
       padding: 10px;
@@ -161,6 +184,31 @@ class MozPageSummarization extends LitElement {
       animation: pulse 1.5s infinite;
       margin-bottom: 10px;
     }
+
+    .bank-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+      max-height: 30vh;
+      overflow-y: auto;
+    }
+
+    .bank-actions-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      padding: 12px 0;
+      border-top: 1px solid var(--color-fg-subtle);
+    }
+
+    .bank-actions-container {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mb-10 {
+      margin-bottom: 10px;
+    }
   `
 
   constructor() {
@@ -169,16 +217,21 @@ class MozPageSummarization extends LitElement {
   }
 
   async initData() {
-    const { last_page_summarization, mock_summary_database } =
-      await browser.storage.local.get([
-        LocalStorageKeys.LAST_PAGE_SUMMARIZATION,
-        LocalStorageKeys.MOCK_SUMMARY_DATABASE,
-      ])
+    const {
+      last_page_summarization,
+      mock_summary_database,
+      last_page_summarization_prompt,
+    } = await browser.storage.local.get([
+      LocalStorageKeys.LAST_PAGE_SUMMARIZATION,
+      LocalStorageKeys.MOCK_SUMMARY_DATABASE,
+      LocalStorageKeys.LAST_PAGE_SUMMARIZATION_PROMPT,
+    ])
 
     last_page_summarization ? (this.response = last_page_summarization) : ''
 
     this.history = mock_summary_database || []
     this.showSaveButton = false
+    this.prompt = last_page_summarization_prompt || PROMPT_OPTIONS[0]
   }
 
   connectedCallback() {
@@ -222,8 +275,7 @@ class MozPageSummarization extends LitElement {
 
   handlePromptSubmit() {
     if (!this.prompt) {
-      alert('Please enter a question to submit.')
-      return
+      this.prompt = PROMPT_OPTIONS[0]
     }
     this.loading = true
     browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
@@ -233,6 +285,9 @@ class MozPageSummarization extends LitElement {
           prompt: this.prompt,
         })
       }
+    })
+    browser.storage.local.set({
+      [LocalStorageKeys.LAST_PAGE_SUMMARIZATION_PROMPT]: this.prompt,
     })
   }
 
@@ -279,7 +334,18 @@ class MozPageSummarization extends LitElement {
     }
   }
 
+  handleOpenPromptBank() {
+    this.showBank = true
+  }
+
+  handleClosePromptBank() {
+    this.showBank = false
+  }
+
   render() {
+    const showResponse = !this.loading && !this.showHistory && this.response
+    const showPromptInput = !this.showHistory
+
     return html`
       <div class="wrapper">
         <div class="container">
@@ -294,7 +360,7 @@ class MozPageSummarization extends LitElement {
             ? html`<div class="loader">
                 <span>Getting your answer...</span>
               </div>`
-            : ''}
+            : null}
           ${this.showHistory
             ? html`
                 <div class="history">
@@ -303,42 +369,94 @@ class MozPageSummarization extends LitElement {
                     : html`<moz-page-summary-history></moz-page-summary-history>`}
                 </div>
               `
-            : html` ${
-                !this.loading && this.response
-                  ? html`<div class="response">
-                        <p .innerHTML=${this.response}></p>
-                      </div>
-
-                      ${this.showSaveButton
-                        ? html`<button
-                            class="pos-button"
-                            @click="${this.handleSaveSummary}"
-                          >
-                            Save Summary
-                          </button>`
-                        : ''}`
-                  : ''
-              }
-                
+            : null}
+          ${showResponse
+            ? html`
+                <div class="response">
+                  <p .innerHTML=${this.response}></p>
+                </div>
+                ${this.showSaveButton
+                  ? html`
+                      <button
+                        class="pos-button"
+                        @click="${this.handleSaveSummary}"
+                      >
+                        Save Summary
+                      </button>
+                    `
+                  : null}
+              `
+            : null}
+          ${showPromptInput
+            ? html`
                 <div class="fields">
-            <label class="label">Enter Prompt</label>
-            <textarea
-              .disabled="${this.loading}"
-              .value="${this.prompt}"
-              rows="4"
-              @input="${this.handleInput}"
-              class="text-input"
-            ></textarea>
-          </div>
-          <button
-            @click="${this.handlePromptSubmit}"
-            class="primary-button"
-            .disabled="${this.loading}"
-          >
-            ${this.loading ? 'Loading...' : 'Ask'}
-          </button>
-        </div>
-                `}
+                  <label class="label">Enter Prompt</label>
+                  <textarea
+                    class="text-input"
+                    .value=${this.prompt}
+                    .disabled=${this.loading}
+                    rows="4"
+                    @input=${this.handleInput}
+                  ></textarea>
+                </div>
+
+                ${!this.showBank
+                  ? html`
+                      <button
+                        class="outline-button mb-10"
+                        @click=${this.handleOpenPromptBank}
+                      >
+                        Select Prompt From Bank
+                      </button>
+                    `
+                  : html` <section>
+                      <div class="bank-container">
+                        ${PROMPT_OPTIONS.map(
+                          (option) => html`
+                            <button
+                              class="outline-button"
+                              @click=${() => {
+                                this.prompt = option
+                                this.handleClosePromptBank()
+                                this.handlePromptSubmit()
+                              }}
+                            >
+                              ${option}
+                            </button>
+                          `
+                        )}
+                      </div>
+                      <div class="bank-actions-wrapper">
+                        <div class="bank-actions-container">
+                          <button
+                            class="primary-button"
+                            @click=${() => {
+                              alert(
+                                'Custom prompt functionality not implemented yet. - NG'
+                              )
+                            }}
+                          >
+                            + Add Custom Prompt
+                          </button>
+                          <button
+                            class="outline-button"
+                            @click=${this.handleClosePromptBank}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </section>`}
+
+                <button
+                  class="primary-button"
+                  @click=${this.handlePromptSubmit}
+                  .disabled=${this.loading}
+                >
+                  ${this.loading ? 'Loading...' : 'Ask'}
+                </button>
+              `
+            : null}
         </div>
       </div>
     `
