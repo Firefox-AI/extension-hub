@@ -25,6 +25,7 @@ const ensureEngineIsReady = async () => {
       taskName: engineMetadata.taskName || 'summarization',
       modelHub: engineMetadata.modelHub || 'huggingface',
       modelId: engineMetadata.modelId || 'Xenova/distilbart-cnn-6-6',
+      backend: 'onnx',
     })
     // Set the engineCreated flag to true
     await browser.storage.session.set({
@@ -39,8 +40,31 @@ export const getMlEngineAIResponse = async (prompt: string) => {
   try {
     await ensureEngineIsReady()
     const trial = (browser as unknown as mlBrowserT).trial
-    const result = await trial?.ml.runEngine({ args: [prompt] })
-    return result
+    const chatInput = [
+      {
+        role: 'system',
+        content:
+          '/no_think Your role is to summarize the provided content as succinctly as possible while retaining the most important information /no_think',
+      },
+      {
+        role: 'user',
+        content: `/no_think ${prompt.slice(0, 2000)} /no_think`, // Limit prompt length to avoid errors
+      },
+    ]
+    let requestOptions = {
+      max_new_tokens: 100,
+      min_new_tokens: 10,
+      return_full_text: true,
+      return_tensors: false,
+      do_sample: false,
+    }
+    console.log('ML Engine request options:', chatInput)
+    const raw_result = await trial?.ml.runEngine({
+      args: [chatInput],
+      options: requestOptions,
+    })
+    const final_answer = raw_result[0]['generated_text'][2]['content']
+    return final_answer
   } catch (err) {
     console.warn('Error generating response:', err)
   }

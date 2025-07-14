@@ -45,9 +45,9 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'page_summarize') {
-      // const result = await getMlEngineAIResponse(prompt)
+      const result = await getMlEngineAIResponse(prompt)
       // const result = await getLocalModelResponse(prompt)
-      const result = await getHuggingFaceResponse(prompt)
+      // const result = await getHuggingFaceResponse(prompt)
       browser.runtime.sendMessage({
         type: 'page_summarize_result',
         result: result,
