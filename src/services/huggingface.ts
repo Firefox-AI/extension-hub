@@ -31,3 +31,27 @@ export const getHuggingFaceResponse = async (prompt: string) => {
     console.error('Error fetching Hugging Face response:', error)
   }
 }
+
+export const getHuggingFaceChatResponse = async (messages: any[]) => {
+  try {
+    const { hugging_face_api_key, hugging_face_model, hugging_face_provider } =
+      await browser.storage.local.get([
+        LocalStorageKeys.HUGGING_FACE_API_KEY,
+        LocalStorageKeys.HUGGING_FACE_MODEL,
+        LocalStorageKeys.HUGGING_FACE_PROVIDER,
+      ])
+
+    const client = new InferenceClient(hugging_face_api_key || '')
+
+    const response = await client.chatCompletion({
+      model: hugging_face_model || 'meta-llama/Llama-3.1-8B-Instruct',
+      provider: hugging_face_provider || 'auto',
+      messages: messages,
+    })
+
+    const content = response.choices[0].message.content
+    return content
+  } catch (error) {
+    console.error('Error fetching Hugging Face chat response:', error)
+  }
+}

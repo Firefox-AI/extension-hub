@@ -26,6 +26,9 @@ export enum LocalStorageKeys {
   LAST_PAGE_SUMMARIZATION = 'last_page_summarization',
   LAST_PAGE_SUMMARIZATION_PROMPT = 'last_page_summarization_prompt',
   MOCK_SUMMARY_DATABASE = 'mock_summary_database',
+
+  // Chat
+  CHAT_HISTORY = 'chat_history',
 }
 
 export enum SessionStorageKeys {

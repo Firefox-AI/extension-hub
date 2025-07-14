@@ -27,6 +27,8 @@ export type MessageTypesT =
   | 'page_summarize_result'
   | 'tab_summarize'
   | 'tab_summarize_result'
+  | 'chat_message'
+  | 'chat_message_result'
 
 export type PromptDataT = {
   prompt: string

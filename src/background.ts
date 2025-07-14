@@ -7,7 +7,10 @@ import { getOpenAIResponse } from './services/openai'
 import { getMlEngineAIResponse } from './services/mlEngine'
 import { getLocalModelResponse } from './services/localModel'
 import { getTogeatherAIResponse } from './services/togetherai'
-import { getHuggingFaceResponse } from './services/huggingface'
+import {
+  getHuggingFaceResponse,
+  getHuggingFaceChatResponse,
+} from './services/huggingface'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
 
@@ -61,6 +64,14 @@ browser.runtime.onMessage.addListener(
       const result = await summarizeTabs(prompt)
       browser.runtime.sendMessage({
         type: 'tab_summarize_result',
+        result: result,
+      })
+    }
+
+    if (message.type === 'chat_message') {
+      const result = await getHuggingFaceChatResponse(message.data)
+      browser.runtime.sendMessage({
+        type: 'chat_message_result',
         result: result,
       })
     }
