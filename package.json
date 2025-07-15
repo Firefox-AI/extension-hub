@@ -14,6 +14,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/firefox-webext-browser": "^120.0.4",
+    "dotenv-webpack": "^8.1.1",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
     "web-ext": "^8.7.1",

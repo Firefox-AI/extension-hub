@@ -13,12 +13,14 @@ import {
 } from './services/huggingface'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
+import { initEnvironment } from './systemConfig'
 
 browser.runtime.onInstalled.addListener(() => {
   browser.menus.removeAll().then(() => {
     // Initialize context menus
     initContextMenus()
   })
+  initEnvironment()
 })
 
 /**
