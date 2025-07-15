@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit'
+import { until } from 'lit-html/directives/until.js'
 import { LocalStorageKeys } from '../../../const'
+import { marked } from 'marked'
 
 type ChatMessageT = {
   role: 'user' | 'ai'
@@ -125,7 +127,13 @@ class MozChat extends LitElement {
               (msg) => html`
                 <div class="bubble-wrapper ${msg.role}">
                   <div class="bubble ${msg.role}">
-                    <div class="text">${msg.content}</div>
+                    <div
+                      class="text"
+                      .innerHTML=${until(
+                        marked.parse(msg.content),
+                        html`<span>…</span>`
+                      )}
+                    ></div>
                   </div>
                 </div>
               `

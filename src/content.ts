@@ -20,7 +20,7 @@ const onUserPrompt = (prompt: string) => {
   const { textContent } = article
   const payload = {
     prompt,
-    fullText: textContent,
+    textContent,
   }
 
   browser.runtime.sendMessage({
