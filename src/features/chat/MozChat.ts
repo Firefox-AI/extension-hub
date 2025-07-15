@@ -4,7 +4,7 @@ import { LocalStorageKeys } from '../../../const'
 import { marked } from 'marked'
 
 type ChatMessageT = {
-  role: 'user' | 'ai'
+  role: 'user' | 'assistant'
   content: string
   ts?: number
 }
@@ -40,7 +40,7 @@ class MozChat extends LitElement {
       const response = message.result
       this.loading = false
 
-      this.messages = [...this.messages, { role: 'ai', content: response }]
+      this.messages = [...this.messages, { role: 'assistant', content: response }]
       this.updated()
       // Scroll to bottom after new message
       this.updateComplete.then(() => {
