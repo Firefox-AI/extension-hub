@@ -1,10 +1,8 @@
 import { LitElement, html, css } from 'lit'
-import { until } from 'lit-html/directives/until.js'
 import { LocalStorageKeys } from '../../../const'
-import { marked } from 'marked'
 
 type ChatMessageT = {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | "system"
   content: string
   ts?: number
 }
@@ -13,6 +11,7 @@ class MozChat extends LitElement {
   messages: ChatMessageT[] = []
   inputValue = ''
   loading = false
+  hasSystemMessage = false
 
   static get properties() {
     return {
@@ -37,6 +36,7 @@ class MozChat extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'chat_message_result') {
+      console.log("[handleIncomingMessage]", message)
       const response = message.result
       this.loading = false
 
@@ -89,9 +89,23 @@ class MozChat extends LitElement {
       this.handleScrollToBottom()
     })
 
+    const systemMessage: ChatMessageT = {
+      role: "system",
+      content: "/no_think You are a scary pirate. You always talk like a pirate"
+    }
+
+    let messagesToSend: ChatMessageT[]
+    
+    if (!this.hasSystemMessage) {
+      this.hasSystemMessage = true
+      messagesToSend = [systemMessage, ...this.messages]
+    } else {
+      messagesToSend = this.messages
+    }
+
     browser.runtime.sendMessage({
       type: 'chat_message',
-      data: this.messages,
+      data: messagesToSend,
     })
   }
 
@@ -127,13 +141,7 @@ class MozChat extends LitElement {
               (msg) => html`
                 <div class="bubble-wrapper ${msg.role}">
                   <div class="bubble ${msg.role}">
-                    <div
-                      class="text"
-                      .innerHTML=${until(
-                        marked.parse(msg.content),
-                        html`<span>…</span>`
-                      )}
-                    ></div>
+                    <div class="text">${msg.content}</div>
                   </div>
                 </div>
               `
