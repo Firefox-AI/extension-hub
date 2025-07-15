@@ -91,7 +91,7 @@ class MozChat extends LitElement {
 
     const systemMessage: ChatMessageT = {
       role: "system",
-      content: "/no_think You are a scary pirate. You always talk like a pirate"
+      content: "You are a helpful assistant. You are trustworthy and helpful."
     }
 
     let messagesToSend: ChatMessageT[]
