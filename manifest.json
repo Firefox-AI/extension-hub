@@ -2,7 +2,22 @@
   "manifest_version": 2,
   "name": "Extension Hub",
   "version": "1.0.0",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "extensionHub@mozilla.org"
+    }
+  },
   "description": "An extension hub to prototype and test various ideas.",
+  "experiment_apis": {
+    "extensionHub": {
+      "parent": {
+        "paths": [["extensionHub"]],
+        "scopes": ["addon_parent"],
+        "script": "dist/api.js"
+      },
+      "schema": "schema.json"
+    }
+  },
   "optional_permissions": ["trialML"],
   "permissions": ["<all_urls>", "menus", "scripting", "storage","activeTab","history","tabs","tabGroups"],
   "icons": {

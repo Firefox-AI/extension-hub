@@ -4,6 +4,14 @@ const Dotenv = require('dotenv-webpack')
 module.exports = {
   mode: 'development',
   entry: {
+    api: {
+      import: './src/api.ts',
+      library: {
+        export: 'default',
+        name: 'extensionHub',
+        type: 'this',
+      },
+    },
     content: './src/content.ts',
     sidebar: './src/sidebar.ts',
     background: './src/background.ts',
