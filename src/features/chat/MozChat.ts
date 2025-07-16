@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../../const'
 
 type ChatMessageT = {
-  role: 'user' | 'assistant' | "system"
+  role: 'user' | 'assistant' | 'system'
   content: string
   ts?: number
 }
@@ -12,12 +12,14 @@ class MozChat extends LitElement {
   inputValue = ''
   loading = false
   hasSystemMessage = false
+  includePageContent = true
 
   static get properties() {
     return {
       messages: { type: Array },
       inputValue: { type: String },
       loading: { type: Boolean },
+      includePageContent: { type: Boolean },
     }
   }
 
@@ -36,11 +38,13 @@ class MozChat extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'chat_message_result') {
-      console.log("[handleIncomingMessage]", message)
       const response = message.result
       this.loading = false
 
-      this.messages = [...this.messages, { role: 'assistant', content: response }]
+      this.messages = [
+        ...this.messages,
+        { role: 'assistant', content: response },
+      ]
       this.updated()
       // Scroll to bottom after new message
       this.updateComplete.then(() => {
@@ -71,6 +75,25 @@ class MozChat extends LitElement {
       .catch(console.error)
   }
 
+  async fetchPageContent(): Promise<{
+    textContent: string
+    siteName: string
+  } | null> {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    })
+
+    const pageContent = tab?.id
+      ? await browser.tabs.sendMessage(tab.id, {
+          type: 'get_page_content',
+          data: {},
+        })
+      : null
+
+    return pageContent
+  }
+
   // Called when the user clicks Send or presses Enter
   async handleSend() {
     const text = this.inputValue.trim()
@@ -90,17 +113,30 @@ class MozChat extends LitElement {
     })
 
     const systemMessage: ChatMessageT = {
-      role: "system",
-      content: "You are a helpful assistant. You are trustworthy and helpful."
+      role: 'system',
+      content: 'You are a helpful assistant. You are trustworthy and helpful.',
     }
 
     let messagesToSend: ChatMessageT[]
-    
+
     if (!this.hasSystemMessage) {
       this.hasSystemMessage = true
       messagesToSend = [systemMessage, ...this.messages]
     } else {
       messagesToSend = this.messages
+    }
+
+    if (this.includePageContent) {
+      const pageContent = await this.fetchPageContent()
+      if (pageContent) {
+        const lastUserIndex = messagesToSend.length - 1
+
+        // Insert page content before the last user message
+        messagesToSend.splice(lastUserIndex, 0, {
+          role: 'user',
+          content: `Here is the page content:\n\n${pageContent.textContent}`,
+        })
+      }
     }
 
     browser.runtime.sendMessage({
@@ -249,7 +285,7 @@ class MozChat extends LitElement {
         border-bottom-right-radius: 0;
       }
 
-      .bubble.ai {
+      .bubble.assistant {
         background: #e5e5ea;
         color: black;
         align-self: flex-start;
