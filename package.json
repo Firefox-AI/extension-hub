@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
-    "start": "web-ext run --firefox=nightly",
+    "start": "web-ext run --firefox=nightly --pref=extensions.experiments.enabled=true",
     "watch": "webpack --watch"
   },
   "keywords": [],

@@ -1,0 +1,13 @@
+[
+  {
+    "functions": [
+      {
+        "async": true,
+        "name": "getTabs",
+        "parameters": [],
+        "type": "function"
+      }
+    ],
+    "namespace": "extensionHub"
+  }
+]

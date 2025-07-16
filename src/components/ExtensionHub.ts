@@ -3,7 +3,12 @@ import { LocalStorageKeys } from '../../const'
 import './MozEngineDownloadProgress'
 
 type FeatureOption = {
-  value: 'page_qa' | 'page_summarization' | 'tab_summarization' | 'chat'
+  value:
+    | 'chat'
+    | 'page_qa'
+    | 'page_summarization'
+    | 'tab_summarization'
+    | 'tabs_debug'
   label: string
   component: () => unknown
 }
@@ -29,6 +34,11 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     value: 'chat',
     label: 'Chat',
     component: () => html`<moz-chat></moz-chat>`,
+  },
+  {
+    value: 'tabs_debug',
+    label: 'Tabs Debug',
+    component: () => html`<moz-tabs-debug></moz-tabs-debug>`,
   },
 ]
 

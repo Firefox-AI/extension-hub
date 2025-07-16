@@ -1,4 +1,7 @@
 export type mlBrowserT = {
+  extensionHub: {
+    getTabs: () => Promise<TabsCollectionT>
+  }
   trial?: {
     ml: {
       createEngine: (options: any) => Promise<any>
@@ -60,4 +63,18 @@ export type PageContentT = {
   textContent: string
   siteName: string
   url?: string
+}
+
+export type TabsT = Array<{
+  title: string
+  url: string
+}>
+
+export type TabsCollectionT = {
+  current: TabsT
+  recent: TabsT
+  smart: TabsT
+  smarter: TabsT
+  start: TabsT
+  tail: TabsT
 }
