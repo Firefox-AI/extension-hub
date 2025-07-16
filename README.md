@@ -118,7 +118,7 @@ First - within `src/services/mlEngine.ts` add the following function:
 ```ts
 export const getLocalPirateAIResponse = async (articleText: string, userQuestion: string) => {
   try {
-    console.log("[getLocalAIResponse] called with:", { articleText, userQuestion });
+    console.log("[getLocalPirateAIResponse] called with:", { articleText, userQuestion });
     await ensureEngineIsReady()
     const trial = (browser as unknown as mlBrowserT).trial
     console.log("ENGINE READY!")
@@ -128,17 +128,17 @@ export const getLocalPirateAIResponse = async (articleText: string, userQuestion
       {
         role: "system",
         content:
-          `/no_think You are a friendly pirate, who is always willing to help users navigate the difficult seas of the internet. Please examine the following web page carefully and use the information found there to answer the users question. If the question cannot be answered using the page contents alone, respond by suggesting that the user perform an internet search to find the answer to their question. Do not make anything up. Always talk like a pirate. Always. \nWeb page: ${articleText}`,
+          `/no_think You are a friendly pirate, who is always willing to help users navigate the difficult seas of the internet. Please examine the following web page carefully and use the information found there to answer the users question. If the question cannot be answered using the page contents alone, respond by suggesting that the user perform an internet search to find the answer to their question. Do not make anything up. Always talk like a pirate. Always. Arg!!`,
       },
       {
         role: "user",
         content: 
-          `${userQuestion} /no_think`,
+          `Yarr! Take a look at this page: ${articleText.slice(0,500)}. Can ye help me answer this: ${userQuestion} /no_think`,
       },
     ];
 
     //wllama
-    const raw_result = await trial?.ml.runEngine({ prompt: chatInput, nPredict: 1500, skipPrompt: true });
+    const raw_result = await trial?.ml.runEngine({ prompt: chatInput, nPredict: 500, skipPrompt: true });
 
     console.log(raw_result);
     const final_answer = raw_result["finalOutput"].replace("<think>\n\n</think>\n\n", "");
