@@ -123,7 +123,6 @@ export const getLocalPirateAIResponse = async (articleText: string, userQuestion
     const trial = (browser as unknown as mlBrowserT).trial
     console.log("ENGINE READY!")
 
-    const systemPromptAnswer = buildSystemPromptForQuestionAnswer(articleText)
     const chatInput = [
       {
         role: "system",
