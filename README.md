@@ -46,7 +46,7 @@ Start the Nightly with the extension hub enabled. (Note: this will start the ver
 npm run start
 ```
 
-![Basic start view](assets/my-image.png)
+![Basic start view](assets/basic_start_view.png)
 
 ### Running the hub with local models
 
