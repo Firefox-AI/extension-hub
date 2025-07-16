@@ -222,3 +222,18 @@ One final step that can be helpful when troubleshooting: CMD+Shift+J will open t
 Now navigate to a page and ask a question: 
 
 ![Pirate chat](assets/pirate_chat.png)
+
+### Alernate loading
+
+In some cases, you may wish to use a custom version of Firefox. In others, you may wish to pass the extension to a product manager. In order to do this, you will need to load the extension using the following process: 
+
+Open Firefox (Nightly)
+
+Naviate to `about:debugging` and click `This Nightly`
+
+![This nightly](assets/this_nightly.png)
+
+Under `Temporary Extensions` click `Load Temporary Add-on...` This will open a file navigator. Open the file called `manifest.json` from with the `extension-hub` base directory. Voila! 
+
+![manifest.json](assets/manifest_json.png)
+
