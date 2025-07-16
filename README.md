@@ -189,7 +189,7 @@ We then need to change the listener code (which defaults to `getOpenAIResponse` 
 ```ts
     if (message.type === 'page_qa') {
       console.log("QA MESSAGE")
-      const result = await getLocalPirateAIResponse(message.data.fullText, message.data.prompt)
+      const result = await getLocalPirateAIResponse(message.data.textContent, message.data.prompt)
       browser.runtime.sendMessage({
         type: 'ai_result',
         result: result,
