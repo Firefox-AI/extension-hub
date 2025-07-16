@@ -207,11 +207,11 @@ npm run start
 
 Once you have done this, Nightly should open with the extension hub showing. Before you can use the model, however, you have to allow the browser to download it. To do this, click the little gear icon on the upper right of the extension hub:
 
-<>
+![Little gear](assets/little_gear.png)
 
 This will open a page that looks like this
 
-<>
+![Extension hub settings](assets/eh_settings.png)
 
 Navigate to `Permissions and data` and click the button labeled `Download and run AI models on your device`.
 
@@ -221,4 +221,4 @@ One final step that can be helpful when troubleshooting: CMD+Shift+J will open t
 
 Now navigate to a page and ask a question: 
 
-<>
+![Pirate chat](assets/pirate_chat.png)
