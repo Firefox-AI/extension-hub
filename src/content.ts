@@ -11,6 +11,8 @@ declare class Readability {
   } | null
 }
 
+import { PageContentT } from '../types'
+
 const onUserPrompt = (prompt: string) => {
   const article = new Readability(document.cloneNode(true) as Document).parse()
 
@@ -47,10 +49,29 @@ const onPageSummarizePrompt = (prompt: string) => {
   })
 }
 
+/**
+ * Get the current page content using Readability.
+ * @returns { textContent: string, siteName: string } | null
+ */
+const getPageContent = (): PageContentT | null => {
+  const article = new Readability(document.cloneNode(true) as Document).parse()
+  if (!article) return null
+  const { textContent, siteName } = article
+  const payload = {
+    textContent,
+    siteName,
+  }
+  return payload
+}
+
 // Handle messages from background script
-browser.runtime.onMessage.addListener((msg) => {
+browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'user_prompt') onUserPrompt(msg.prompt)
   if (msg.type === 'page_summarize_prompt') onPageSummarizePrompt(msg.prompt)
+  if (msg.type === 'get_page_content') {
+    sendResponse(getPageContent())
+    return true // indicate async response
+  }
 })
 
 console.log('>>> Content script loaded.')

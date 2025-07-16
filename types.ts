@@ -52,3 +52,9 @@ export type SummaryHistoryItemT = CurrentSummaryT & {
   date: string
   id: string
 }
+
+export type PageContentT = {
+  textContent: string
+  siteName: string
+  url?: string
+}
