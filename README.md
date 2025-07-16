@@ -223,7 +223,8 @@ Now navigate to a page and ask a question:
 
 ![Pirate chat](assets/pirate_chat.png)
 
-### Alernate loading
+## FAQ
+### How can I load the extension hub into Firefox directly? 
 
 In some cases, you may wish to use a custom version of Firefox. In others, you may wish to pass the extension to a product manager. In order to do this, you will need to load the extension using the following process: 
 
