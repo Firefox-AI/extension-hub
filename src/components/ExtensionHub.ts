@@ -1,5 +1,6 @@
 import { LitElement, html } from 'lit'
 import { LocalStorageKeys } from '../../const'
+import './MozEngineDownloadProgress'
 
 type FeatureOption = {
   value: 'page_qa' | 'page_summarization' | 'tab_summarization' | 'chat'
@@ -73,6 +74,8 @@ class MozExtensionHub extends LitElement {
     const selected = FEATURE_OPTIONS.find((opt) => opt.value === this.feature)
     return html`
       <div class="wrapper">
+        <moz-engine-download-progress></moz-engine-download-progress>
+
         <div class="header">
           <select class="select" @change="${this.handleSelectChange}">
             ${FEATURE_OPTIONS.map(

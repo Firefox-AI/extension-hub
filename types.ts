@@ -4,6 +4,9 @@ export type mlBrowserT = {
       createEngine: (options: any) => Promise<any>
       runEngine: (options: any) => Promise<any>
       deleteCachedModels: () => Promise<void>
+      onProgress: {
+        addListener: (callback: (data: any) => void) => void
+      }
     }
   }
   tabs: {
