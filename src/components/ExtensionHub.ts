@@ -75,7 +75,6 @@ class MozExtensionHub extends LitElement {
     return html`
       <div class="wrapper">
         <moz-engine-download-progress></moz-engine-download-progress>
-
         <div class="header">
           <select class="select" @change="${this.handleSelectChange}">
             ${FEATURE_OPTIONS.map(
