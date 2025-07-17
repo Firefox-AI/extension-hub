@@ -132,7 +132,7 @@ class MozChat extends LitElement {
 
         // Insert page content before the last user message
         messagesToSend.splice(lastUserIndex, 0, {
-          role: 'user',
+          role: 'system',
           content: `Here is the page content:\n\n${pageContent.textContent.slice(0,1000)}`,
         })
       }
