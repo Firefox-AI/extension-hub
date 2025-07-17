@@ -30,13 +30,14 @@ export class MozEngineDownloadProgress extends LitElement {
   }
 
   handleIncomingMessage = async (message: any) => {
-    if (message.type === 'mlEngine_download_progress') {
-      this.isVisible = this.closedByUser ? false : true
-      this.progress = message.progress
-      if (this.progress >= 99) {
-        this.isVisible = false
-        this.progress = 0
-      }
+    if (message.type !== 'mlEngine_download_progress') return
+
+    this.isVisible = this.closedByUser ? false : true
+    this.progress = message.progress
+    // Adding a buffer to 100 with 99 because it does not always reach exactly 100%
+    if (this.progress >= 99) {
+      this.isVisible = false
+      this.progress = 0
     }
   }
 
