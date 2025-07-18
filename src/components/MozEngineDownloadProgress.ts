@@ -29,7 +29,7 @@ export class MozEngineDownloadProgress extends LitElement {
     super.disconnectedCallback()
   }
 
-  handleIncomingMessage = async (message: any) => {
+  handleIncomingMessage = (message: any) => {
     if (message.type !== 'mlEngine_download_progress') return
 
     this.isVisible = this.closedByUser ? false : true
