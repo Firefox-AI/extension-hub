@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
     "start": "web-ext run --firefox=nightly --pref=extensions.experiments.enabled=true",
-    "watch": "webpack --watch"
+    "watch": "webpack --watch",
+    "xpi": "webpack && web-ext build --overwrite-dest"
   },
   "keywords": [],
   "author": "",
