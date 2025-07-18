@@ -36,8 +36,7 @@ export class MozEngineDownloadProgress extends LitElement {
     this.progress = message.progress
     // Adding a buffer to 100 with 99 because it does not always reach exactly 100%
     if (this.progress >= 99) {
-      this.isVisible = false
-      this.progress = 0
+      this.remove()
     }
   }
 
