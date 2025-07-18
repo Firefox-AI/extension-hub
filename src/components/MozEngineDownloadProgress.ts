@@ -29,20 +29,19 @@ export class MozEngineDownloadProgress extends LitElement {
     super.disconnectedCallback()
   }
 
-  handleIncomingMessage = async (message: any) => {
+  handleIncomingMessage = (message: any) => {
     if (message.type !== 'mlEngine_download_progress') return
 
     this.isVisible = this.closedByUser ? false : true
     this.progress = message.progress
     // Adding a buffer to 100 with 99 because it does not always reach exactly 100%
     if (this.progress >= 99) {
-      this.isVisible = false
-      this.progress = 0
+      this.remove()
     }
   }
 
   render() {
-    if (!this.isVisible) {
+    if (!this.isVisible || this.closedByUser) {
       return html``
     }
 
