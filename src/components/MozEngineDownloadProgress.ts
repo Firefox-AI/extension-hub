@@ -42,7 +42,7 @@ export class MozEngineDownloadProgress extends LitElement {
   }
 
   render() {
-    if (!this.isVisible) {
+    if (!this.isVisible || this.closedByUser) {
       return html``
     }
 
