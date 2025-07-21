@@ -26,6 +26,9 @@ export class MozPageSummaryHistory extends LitElement {
       padding: 10px;
       color: var(--color-fg);
       background-color: var(--color-bg);
+      /* override the sidebar’s default no‐select rules */
+      user-select: text !important;
+      -moz-user-select: text !important;
     }
 
     .container {
