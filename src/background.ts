@@ -5,6 +5,7 @@
 import { MessageTypesT, MessagePageAssistT } from '../types'
 import { getPageAssistResponse } from './services/pageAssist'
 import { getHuggingFaceChatResponse } from './services/huggingface'
+import { getPlanResponse } from './services/plan-checklist'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
 import { initEnvironment } from './systemConfig'
@@ -72,6 +73,14 @@ browser.runtime.onMessage.addListener(
       const result = await getHuggingFaceChatResponse(message.data)
       browser.runtime.sendMessage({
         type: 'chat_message_result',
+        result: result,
+      })
+    }
+
+    if (message.type === 'plan_check_request') {
+      const result = await getPlanResponse(message.data)
+      browser.runtime.sendMessage({
+        type: 'plan_check_result',
         result: result,
       })
     }

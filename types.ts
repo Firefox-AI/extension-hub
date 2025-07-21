@@ -31,6 +31,8 @@ export type MessageTypesT =
   | 'ai_result'
   | 'page_summarize'
   | 'page_summarize_result'
+  | 'plan_check_request'
+  | 'plan_check_result'
   | 'tab_summarize'
   | 'tab_summarize_result'
   | 'chat_message'
