@@ -8,6 +8,7 @@ type FeatureOption = {
     | 'chat'
     | 'page_qa'
     | 'page_summarization'
+    | 'plan_checklist'
     | 'tab_summarization'
     | 'tabs_debug'
   label: string
@@ -35,6 +36,11 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     value: 'chat',
     label: 'Chat',
     component: () => html`<moz-chat></moz-chat>`,
+  },
+  {
+    value: 'plan_checklist',
+    label: 'Planner Checklist',
+    component: () => html`<moz-plan-checklist></moz-plan-checklist>`,
   },
   {
     value: 'tabs_debug',
