@@ -24,12 +24,11 @@ export class MozEngineWarning extends LitElement {
     this.isVisible = !this.isLocalAiEnabled
   }
 
-  handleEnable() {
-    ;(browser.permissions.request as any)({ permissions: ['trialML'] }).then(
-      (granted: boolean) => {
-        this.isVisible = !granted
-      }
-    )
+  handleEnable = async () => {
+    const granted: boolean = await (browser.permissions.request as any)({
+      permissions: ['trialML'],
+    })
+    this.isVisible = !granted
   }
 
   static styles = css`
