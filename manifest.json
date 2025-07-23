@@ -1,30 +1,50 @@
 {
   "manifest_version": 2,
   "name": "Extension Hub",
-  "version": "1.0.0",
+  "version": "1.1",
   "browser_specific_settings": {
     "gecko": {
-      "id": "extensionHub@mozilla.org"
+      "id": "extensionHub@mozilla.org",
+      "update_url": "https://raw.githubusercontent.com/Firefox-AI/extension-hub/refs/heads/main/updates.json"
     }
   },
   "description": "An extension hub to prototype and test various ideas.",
   "experiment_apis": {
     "extensionHub": {
       "parent": {
-        "paths": [["extensionHub"]],
-        "scopes": ["addon_parent"],
+        "paths": [
+          [
+            "extensionHub"
+          ]
+        ],
+        "scopes": [
+          "addon_parent"
+        ],
         "script": "dist/api.js"
       },
       "schema": "schema.json"
     }
   },
-  "optional_permissions": ["trialML"],
-  "permissions": ["<all_urls>", "menus", "scripting", "storage","activeTab","history","tabs","tabGroups"],
+  "optional_permissions": [
+    "trialML"
+  ],
+  "permissions": [
+    "<all_urls>",
+    "activeTab",
+    "history",
+    "menus",
+    "scripting",
+    "storage",
+    "tabGroups",
+    "tabs"
+  ],
   "icons": {
     "64": "assets/icon.svg"
   },
   "background": {
-    "scripts": ["dist/background.js"],
+    "scripts": [
+      "dist/background.js"
+    ],
     "persistent": false
   },
   "sidebar_action": {
@@ -34,8 +54,13 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["vendor/Readability.js","dist/content.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dist/content.js",
+        "vendor/Readability.js"
+      ]
     }
   ],
   "options_ui": {
