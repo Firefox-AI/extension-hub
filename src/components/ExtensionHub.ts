@@ -1,6 +1,7 @@
 import { LitElement, html } from 'lit'
 import { LocalStorageKeys } from '../../const'
 import './MozEngineDownloadProgress'
+import './MozEngineWarning'
 
 type FeatureOption = {
   value:
@@ -85,6 +86,7 @@ class MozExtensionHub extends LitElement {
     return html`
       <div class="wrapper">
         <moz-engine-download-progress></moz-engine-download-progress>
+        <moz-engine-warning></moz-engine-warning>
         <div class="header">
           <select class="select" @change="${this.handleSelectChange}">
             ${FEATURE_OPTIONS.map(
