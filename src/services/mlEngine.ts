@@ -69,3 +69,71 @@ export const getMlEngineAIResponse = async (prompt: string) => {
     console.warn('Error generating response:', err)
   }
 }
+
+
+/** Embedding model
+ */
+const ensureEmbeddingEngineReady = async () => {
+  const { embeddingEngineCreated } = await browser.storage.session.get(
+    SessionStorageKeys.EMBEDDING_ENGINE_CREATED
+  )
+
+  if (embeddingEngineCreated) return
+
+  console.log('[Embedding] Creating smart-tab-embedding engine...')
+  try {
+    const trial = (browser as unknown as mlBrowserT).trial
+
+    await trial?.ml.createEngine({
+      taskName: 'feature-extraction',
+      modelHub: 'huggingface',
+      modelId: 'Mozilla/smart-tab-embedding',
+      // featureId: 'smart-tab-embedding',
+      dtype: 'q8',
+      backend: 'onnx-native',
+      timeoutMS: 2 * 60 * 1000,
+    })
+
+    await browser.storage.session.set({
+      [SessionStorageKeys.EMBEDDING_ENGINE_CREATED]: true,
+    })
+    console.log('[embedding] engine created successfully')
+
+  } catch (err) {
+    console.warn('Error creating embedding engine:', err)
+  }
+}
+
+export const getEmbedding = async (text: string): Promise<number[] | undefined> => {
+  await ensureEmbeddingEngineReady()
+
+  try {
+    console.log('[embedding] requested for:', text)
+    const trial = (browser as unknown as mlBrowserT).trial
+    const result = await trial?.ml.runEngine({
+      // featureId: 'smart-tab-embedding',
+      args: [[text]],
+      options: {
+        pooling: 'mean',
+        normalize: true,
+      },
+    })
+
+    console.log('[embedding] Raw result:', result)
+
+    if (!result) {
+      console.warn('[embedding] runEngine returned undefined or null')
+      return undefined
+    }
+
+    if (!Array.isArray(result[0])) {
+      console.warn('[embedding] result[0] is not an array:', result[0])
+      return undefined
+    }
+
+    return result[0] as number[]
+  } catch (err) {
+    console.error('[embedding] Failed to get embedding:', err)
+    return undefined
+  }
+}

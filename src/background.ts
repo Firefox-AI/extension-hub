@@ -11,6 +11,7 @@ import {
   getHuggingFaceResponse,
   getHuggingFaceChatResponse,
 } from './services/huggingface'
+import { getPlannerResponse } from './services/planner'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
 import { initEnvironment } from './systemConfig'
@@ -38,10 +39,12 @@ const buildPrompt = (prompt: string, textContent: string) => {
  */
 browser.runtime.onMessage.addListener(
   async (message: { type: MessageTypesT; data: any }) => {
+    console.log('[BG] Received message:', message)
     // TODO - probably need to diversify prompts based on type of request
-    const prompt = buildPrompt(message.data.prompt, message.data.textContent)
+    // const prompt = buildPrompt(message.data.prompt, message.data.textContent)
 
     if (message.type === 'page_qa') {
+      const prompt = buildPrompt(message.data.prompt, message.data.textContent)
       const result = await getOpenAIResponse(prompt)
       browser.runtime.sendMessage({
         type: 'ai_result',
@@ -50,6 +53,7 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'page_summarize') {
+      const prompt = buildPrompt(message.data.prompt, message.data.textContent)
       const result = await getMlEngineAIResponse(prompt)
       // const result = await getLocalModelResponse(prompt)
       // const result = await getHuggingFaceResponse(prompt)
@@ -63,6 +67,7 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'tab_summarize') {
+      const prompt = buildPrompt(message.data.prompt, message.data.textContent)
       const result = await summarizeTabs(prompt)
       browser.runtime.sendMessage({
         type: 'tab_summarize_result',
@@ -76,6 +81,28 @@ browser.runtime.onMessage.addListener(
         type: 'chat_message_result',
         result: result,
       })
+    }
+    
+    /* Planner
+     */
+    if (message.type === 'planner') {
+      // Initial planner request
+      const result = await getPlannerResponse(message.data.goal, message.data.type, false)
+      browser.runtime.sendMessage({
+        type: 'planner_result',
+        result,
+      })
+      return true
+    }
+
+    if (message.type === 'planner_followup') {
+      // Follow-up input, continue conversation
+      const result = await getPlannerResponse(message.data.followup, message.data.type, true)
+      browser.runtime.sendMessage({
+        type: 'planner_result',
+        result,
+      })
+      return true
     }
   }
 )

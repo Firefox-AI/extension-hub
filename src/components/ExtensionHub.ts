@@ -2,7 +2,7 @@ import { LitElement, html } from 'lit'
 import { LocalStorageKeys } from '../../const'
 
 type FeatureOption = {
-  value: 'page_qa' | 'page_summarization' | 'tab_summarization' | 'chat'
+  value: 'page_qa' | 'page_summarization' | 'tab_summarization' | 'chat' | 'planner'
   label: string
   component: () => unknown
 }
@@ -28,6 +28,11 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     value: 'chat',
     label: 'Chat',
     component: () => html`<moz-chat></moz-chat>`,
+  },
+  {
+    value: 'planner',
+    label: 'Planner',
+    component: () => html`<moz-planner></moz-planner>`,
   },
 ]
 
