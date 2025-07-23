@@ -38,8 +38,15 @@ const ensureEngineIsReady = async () => {
 
 export const getMlEngineAIResponse = async (prompt: string) => {
   try {
-    await ensureEngineIsReady()
     const trial = (browser as unknown as mlBrowserT).trial
+    trial?.ml.onProgress.addListener((data) => {
+      const { progress } = data
+      browser.runtime.sendMessage({
+        type: 'mlEngine_download_progress',
+        progress,
+      })
+    })
+    await ensureEngineIsReady()
     const chatInput = [
       {
         role: 'system',

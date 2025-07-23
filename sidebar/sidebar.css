@@ -50,3 +50,31 @@ moz-extension-hub {
     color: var(--color-text);
   }
 }
+
+moz-engine-download-progress {
+  --color-bg: #094f22dc;
+  --color-fg: #ffffff;
+  position: fixed;
+  top: 0;
+  width: 100%;
+
+  .progress-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--color-fg);
+    background-color: var(--color-bg);
+    padding: 24px;
+  }
+
+  .progress-close-button {
+    position: absolute;
+    top: 4px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--color-fg);
+    font-size: 16px;
+    cursor: pointer;
+  }
+}
