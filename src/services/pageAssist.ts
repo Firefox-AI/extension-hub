@@ -1,5 +1,5 @@
 /**
- * This Service is dedicated to be ab abstraction layer for the Page Assist AKA Page Buddy
+ * This Service is dedicated to be an abstraction layer for the Page Assist AKA Page Buddy
  * It will handle the communication with different AI services to get the response for the page content.
  */
 import { MlEngineService } from './mlEngine'
