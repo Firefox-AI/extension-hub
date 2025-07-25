@@ -1,4 +1,4 @@
-import { EngineMetadataT, mlBrowserT } from '../../types'
+import { EngineMetadataT, mlBrowserT, RunEngineMetadataT } from '../../types'
 import { LocalStorageKeys, SessionStorageKeys } from '../../const'
 
 /**
@@ -6,39 +6,55 @@ import { LocalStorageKeys, SessionStorageKeys } from '../../const'
  * has been created, and we are limited to just 1 engine per extension, we
  * store a boolean in session storage.
  */
-const ensureEngineIsReady = async () => {
-  const { engineCreated } = await browser.storage.session.get(
+const ensureEngineIsReady = async (engineMetadata: EngineMetadataT) => {
+  const { engine_created } = await browser.storage.session.get(
     SessionStorageKeys.ENGINE_CREATED
   )
-  const engineMetadata: EngineMetadataT = (
+
+  // Use this option if you want the user to fill out the settinqs page
+  // consider moving this to the client service like "pageAssistant.ts" and
+  // let those files choose if they want to use local configs or not.
+  const localEngineMetadata: EngineMetadataT = (
     await browser.storage.local.get(LocalStorageKeys.ENGINE_METADATA)
   ).engine_metadata
 
-  console.log('trying to Creating engine...')
-  if (engineCreated) return
-  console.log('Creating engine...')
+  console.log('Trying to creating ML Engine...')
+  console.log('Engine has already been created:', Boolean(engine_created))
+
+  if (engine_created) return
+
   try {
+    console.log('Attempting to create ML Engine')
     const trial = (browser as unknown as mlBrowserT).trial
 
-    // TODO consider better defaults
-    await trial?.ml.createEngine({
-      taskName: engineMetadata.taskName || 'summarization',
-      modelHub: engineMetadata.modelHub || 'huggingface',
-      modelId: engineMetadata.modelId || 'Xenova/distilbart-cnn-6-6',
-      backend: 'onnx',
-    })
+    // Defualt to local congfigs if metat data is not given.
+    await trial?.ml.createEngine(
+      engineMetadata ? engineMetadata : localEngineMetadata
+    )
     // Set the engineCreated flag to true
     await browser.storage.session.set({
       [SessionStorageKeys.ENGINE_CREATED]: true,
     })
   } catch (err) {
-    console.warn('Error creating engine:', err)
+    console.error('Error creating ML Engin:', err)
   }
 }
 
-export const getMlEngineAIResponse = async (prompt: string) => {
+/**
+ * This is a reusable function to get the AI response from the ML Engine.
+ * do not add customer logic here, this is a generic function to get the AI response.
+ * @param runEngineMetadata
+ * @param engineMetadata
+ * @returns ML Engine AI response
+ */
+export const getMlEngineAIResponse = async (
+  runEngineMetadata: RunEngineMetadataT,
+  engineMetadata: EngineMetadataT
+) => {
   try {
     const trial = (browser as unknown as mlBrowserT).trial
+
+    // Init progress pub sub
     trial?.ml.onProgress.addListener((data) => {
       const { progress } = data
       browser.runtime.sendMessage({
@@ -46,32 +62,12 @@ export const getMlEngineAIResponse = async (prompt: string) => {
         progress,
       })
     })
-    await ensureEngineIsReady()
-    const chatInput = [
-      {
-        role: 'system',
-        content:
-          '/no_think Your role is to summarize the provided content as succinctly as possible while retaining the most important information /no_think',
-      },
-      {
-        role: 'user',
-        content: `/no_think ${prompt.slice(0, 2000)} /no_think`, // Limit prompt length to avoid errors
-      },
-    ]
-    let requestOptions = {
-      max_new_tokens: 100,
-      min_new_tokens: 10,
-      return_full_text: true,
-      return_tensors: false,
-      do_sample: false,
-    }
-    console.log('ML Engine request options:', chatInput)
-    const raw_result = await trial?.ml.runEngine({
-      args: [chatInput],
-      options: requestOptions,
-    })
-    const final_answer = raw_result[0]['generated_text'][2]['content']
-    return final_answer
+
+    await ensureEngineIsReady(engineMetadata)
+
+    // Response will be unique to what engine you set up.
+    const response = await trial?.ml.runEngine(runEngineMetadata)
+    return response
   } catch (err) {
     console.warn('Error generating response:', err)
   }
