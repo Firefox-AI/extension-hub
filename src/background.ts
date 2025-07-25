@@ -7,6 +7,7 @@ import { getPageAssistResponse } from './services/pageAssist'
 import { getHuggingFaceChatResponse } from './services/huggingface'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
+import { getPlanResponse } from './services/plan-checklist'
 import { initEnvironment } from './systemConfig'
 
 browser.runtime.onInstalled.addListener(() => {
