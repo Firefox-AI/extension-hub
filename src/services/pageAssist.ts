@@ -2,7 +2,7 @@
  * This Service is dedicated to be ab abstraction layer for the Page Assist AKA Page Buddy
  * It will handle the communication with different AI services to get the response for the page content.
  */
-import { getMlEngineAIResponse } from './mlEngine'
+import { MlEngineService } from './mlEngine'
 import {
   RunEngineMetadataT,
   EngineMetadataT,
@@ -46,15 +46,14 @@ export const getPageAssistResponse = async (
     skipPrompt: true,
   }
 
-  const response = await getMlEngineAIResponse(
-    runEngineMetadata,
-    engineMetadata
-  )
+  const mlEngineService = new MlEngineService(engineMetadata)
+  const response = await mlEngineService.getAIResponse<{
+    finalOutput: string
+  }>(runEngineMetadata)
 
-  const final_answer = response['finalOutput'].replace(
-    '<think>\n\n</think>\n\n',
-    ''
-  )
+  const final_answer = response
+    ? response.finalOutput.replace('<think>\n\n</think>\n\n', '')
+    : 'No response from AI engine'
 
   console.log(
     'Page Assistant response:',
