@@ -5,7 +5,6 @@
 import { MessageTypesT, MessagePageAssistT } from '../types'
 import { getPageAssistResponse } from './services/pageAssist'
 import { getHuggingFaceChatResponse } from './services/huggingface'
-import { getPlanResponse } from './services/plan-checklist'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
 import { initEnvironment } from './systemConfig'
