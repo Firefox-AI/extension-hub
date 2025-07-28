@@ -138,7 +138,7 @@ export const processPlanRequest = async (
       .replace(/[“”]/g, '"') // fix smart quotes if present
       .replace(/[^\x20-\x7E\s\n\r\t{}[\]":,.-]/g, '') // strip any weird Unicode control chars
 
-    planResult = (await JSON.parse(cleanedResponse)) as PlanResultT
+    planResult = JSON.parse(cleanedResponse) as PlanResultT
     // Ensure each item has a unique ID and proper fields
     planResult.items = planResult.items.map((item, index) => ({
       ...item,
