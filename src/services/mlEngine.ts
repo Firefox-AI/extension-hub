@@ -31,6 +31,14 @@ export class MlEngineService {
       return
     }
 
+    // Init progress pub sub
+    this.trial?.ml.onProgress.addListener(({ progress }) => {
+      browser.runtime.sendMessage({
+        type: 'mlEngine_download_progress',
+        progress,
+      })
+    })
+
     try {
       console.log('Attempting to create ML Engine')
 
@@ -65,14 +73,6 @@ export class MlEngineService {
     runEngineMetadata: RunEngineMetadataT
   ): Promise<T | undefined> {
     try {
-      // Init progress pub sub
-      this.trial?.ml.onProgress.addListener(({ progress }) => {
-        browser.runtime.sendMessage({
-          type: 'mlEngine_download_progress',
-          progress,
-        })
-      })
-
       await this.ensureEngineIsReady()
 
       // Response will be unique to what engine you set up.
