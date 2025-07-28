@@ -22,5 +22,5 @@ export const getPageQandAResponse = async (prompt: string): Promise<string> => {
     return content || 'No response content available.'
   }
 
-  return 'Error: No valid response from OpenAI.'
+  return 'Error: No response from AI.'
 }

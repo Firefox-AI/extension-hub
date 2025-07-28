@@ -6,9 +6,14 @@ import { getHuggingFaceChatResponse } from './services/huggingface'
 import { getPageQandAResponse } from './services/pageQandA'
 import { MessageTypesT, MessagePageAssistT } from '../types'
 import { getPageAssistResponse } from './services/pageAssist'
+<<<<<<< HEAD
+=======
+import { getHuggingFaceChatResponse } from './services/huggingface'
+import { getPageQandAResponse } from './services/pageQandA'
+import { getPlanResponse } from './services/plan-checklist'
+>>>>>>> 974f680 (generalizing openai service)
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
-import { getPlanResponse } from './services/plan-checklist'
 import { initEnvironment } from './systemConfig'
 
 browser.runtime.onInstalled.addListener(() => {
