@@ -37,7 +37,7 @@ export const PLANNER_PROMPTS = {
 const buildPlanPrompt = (
   planData: PlanDataT,
   tabsContent: string,
-  existingPlan?: PlanResultT
+  existingPlan?: PlanResultT,
 ) => {
   let prompt = PLANNER_PROMPTS[planData.plannerType]
 
@@ -56,7 +56,7 @@ const buildPlanPrompt = (
       .join('\n')}\n\nPENDING ITEMS:\n${pendingItems
       .map((item) => `- ${item.text}`)
       .join(
-        '\n'
+        '\n',
       )}\n\nIMPORTANT:\n- Keep all completed items unless they're truly no longer relevant\n- Update pending items based on the new browser tabs context\n- Add new relevant items if the updated tabs suggest additional tasks\n- Maintain the overall plan coherence while incorporating new information\n- Focus on providing updated next steps and refined task descriptions`
   } else {
     prompt +=
@@ -69,12 +69,12 @@ const buildPlanPrompt = (
 // Helper function for smarter item matching
 const findMatchingItem = (
   newItem: PlanItemT,
-  existingItems: PlanItemT[]
+  existingItems: PlanItemT[],
 ): PlanItemT | null => {
   // Strategy 1: Exact text match
   let match = existingItems.find(
     (existing) =>
-      existing.text.toLowerCase().trim() === newItem.text.toLowerCase().trim()
+      existing.text.toLowerCase().trim() === newItem.text.toLowerCase().trim(),
   )
   if (match) return match
 
@@ -104,7 +104,7 @@ const findMatchingItem = (
   match = existingItems.find((existing) => {
     const existingKeywords = getKeywords(existing.text)
     const commonKeywords = newKeywords.filter((keyword) =>
-      existingKeywords.includes(keyword)
+      existingKeywords.includes(keyword),
     )
     return commonKeywords.length >= 2 // At least 2 common keywords
   })
@@ -115,7 +115,7 @@ const findMatchingItem = (
 export const processPlanRequest = async (
   planData: PlanDataT,
   tabsContent: string,
-  existingPlan?: PlanResultT
+  existingPlan?: PlanResultT,
 ): Promise<PlanResultT> => {
   const planPrompt = buildPlanPrompt(planData, tabsContent, existingPlan)
   const aiResponse = await getOpenAIResponse({
@@ -195,7 +195,8 @@ export const processPlanRequest = async (
     // Fallback if JSON parsing fails
     console.error('Error parsing AI response:', parseError)
     planResult = {
-      explanation: aiResponse.choices[0]?.message?.content || 'Error generating plan',
+      explanation:
+        aiResponse.choices[0]?.message?.content || 'Error generating plan',
       items: [],
     }
   }
@@ -204,7 +205,7 @@ export const processPlanRequest = async (
 }
 
 export const getPlanResponse = async (
-  messageData: PlanRequestMessageData
+  messageData: PlanRequestMessageData,
 ): Promise<PlanResultT> => {
   try {
     const { planData, tabsContent, existingPlan } = messageData
