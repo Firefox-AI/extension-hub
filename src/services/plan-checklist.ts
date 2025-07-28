@@ -195,7 +195,7 @@ export const processPlanRequest = async (
     // Fallback if JSON parsing fails
     console.error('Error parsing AI response:', parseError)
     planResult = {
-      explanation: aiResponse,
+      explanation: aiResponse.choices[0]?.message?.content || 'Error generating plan',
       items: [],
     }
   }
