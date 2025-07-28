@@ -41,7 +41,7 @@ export class MlEngineService {
         await browser.storage.local.get(LocalStorageKeys.ENGINE_METADATA)
       ).engine_metadata
 
-      // Default to local configs if metadata is not given.
+      // Default to local configs if meta data is not given.
       await this.trial?.ml.createEngine(
         this.engineMetadata ?? localEngineMetadata
       )
