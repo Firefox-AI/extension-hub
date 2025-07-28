@@ -18,10 +18,9 @@ export const getPageQandAResponse = async (prompt: string): Promise<string> => {
   })
 
   if (response && response.choices && response.choices.length > 0) {
-    const content = response.choices[0]?.message?.content;
-    if (content) {
-      return content;
-    }
+    const content = response.choices[0]?.message.content
+    return content || 'No response content available.'
   }
-  return 'Error: No valid response content from AI.';
+
+  return 'Error: No valid response from OpenAI.'
 }
