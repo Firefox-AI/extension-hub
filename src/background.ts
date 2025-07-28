@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { MessageTypesT } from '../types'
-import { getOpenAIResponse } from './services/openai'
 import { getMlEngineAIResponse } from './services/mlEngine'
 import { getLocalModelResponse } from './services/localModel'
 import { getTogeatherAIResponse } from './services/togetherai'
@@ -11,6 +10,7 @@ import {
   getHuggingFaceResponse,
   getHuggingFaceChatResponse,
 } from './services/huggingface'
+import { getPageQandAResponse } from './services/pageQandA'
 import { getPlanResponse } from './services/plan-checklist'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
@@ -43,9 +43,9 @@ browser.runtime.onMessage.addListener(
     const prompt = buildPrompt(message.data.prompt, message.data.textContent)
 
     if (message.type === 'page_qa') {
-      const result = await getOpenAIResponse(prompt)
+      const result = await getPageQandAResponse(prompt)
       browser.runtime.sendMessage({
-        type: 'ai_result',
+        type: 'page_qa_result',
         result: result,
       })
     }
