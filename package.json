@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
     "release": "node release.js",
-    "start": "web-ext run --firefox=nightly --pref=extensions.experiments.enabled=true",
+    "start": "web-ext run --firefox=nightly --pref=extensions.experiments.enabled=true --pref=browser.startup.page=3 --profile-create-if-missing --keep-profile-changes --firefox-profile=./profile",
+    "start:fresh": "web-ext run --firefox=nightly --pref=extensions.experiments.enabled=true",
     "watch": "webpack --watch",
     "xpi": "webpack && web-ext build --artifacts-dir . --filename extension-hub.xpi --overwrite-dest"
   },
