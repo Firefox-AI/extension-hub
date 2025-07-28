@@ -18,7 +18,10 @@ export const getPageQandAResponse = async (prompt: string): Promise<string> => {
   })
 
   if (response && response.choices && response.choices.length > 0) {
-    return response.choices[0].message.content
+    const content = response.choices[0]?.message?.content;
+    if (content) {
+      return content;
+    }
   }
-  return 'Error: No response from AI.'
+  return 'Error: No valid response content from AI.';
 }
