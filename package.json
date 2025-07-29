@@ -29,6 +29,7 @@
     "css-loader": "^7.1.2",
     "lit": "^3.3.0",
     "marked": "^16.0.0",
+    "openai": "^5.10.2",
     "style-loader": "^4.0.0",
     "together-ai": "^0.17.0",
     "zod": "^3.25.75",

@@ -28,7 +28,7 @@ export type mlBrowserT = {
 
 export type MessageTypesT =
   | 'page_qa'
-  | 'ai_result'
+  | 'page_qa_result'
   | 'page_summarize'
   | 'page_summarize_result'
   | 'plan_check_request'

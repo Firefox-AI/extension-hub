@@ -49,7 +49,9 @@ const buildPlanPrompt = (
     const completedItems = existingPlan.items.filter((item) => item.completed)
     const pendingItems = existingPlan.items.filter((item) => !item.completed)
 
-    prompt += `\n\nThis is an UPDATE to an existing plan. Here's the original plan context:\n\nORIGINAL PLAN: "${existingPlan.explanation}"\n\nCOMPLETED ITEMS (preserve these unless truly obsolete):\n${completedItems
+    prompt += `\n\nThis is an UPDATE to an existing plan. Here's the original plan context:\n\nORIGINAL PLAN: "${
+      existingPlan.explanation
+    }"\n\nCOMPLETED ITEMS (preserve these unless truly obsolete):\n${completedItems
       .map((item) => `- ${item.text}`)
       .join('\n')}\n\nPENDING ITEMS:\n${pendingItems
       .map((item) => `- ${item.text}`)
@@ -116,11 +118,27 @@ export const processPlanRequest = async (
   existingPlan?: PlanResultT,
 ): Promise<PlanResultT> => {
   const planPrompt = buildPlanPrompt(planData, tabsContent, existingPlan)
-  const aiResponse = await getOpenAIResponse(planPrompt)
+  const aiResponse = await getOpenAIResponse({
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are a helpful assistant. Answering this question to the best of your ability, try and only use the context provided with the question. If the information is not present in the context say you do not know.',
+      },
+      { role: 'user', content: planPrompt },
+    ],
+  })
 
   let planResult: PlanResultT
   try {
-    planResult = JSON.parse(aiResponse)
+    const rawResponse = aiResponse.choices[0].message.content
+    const cleanedResponse = rawResponse
+      .trim()
+      .replace(/^```json\s*|```$/g, '') // remove code fences
+      .replace(/[“”]/g, '"') // fix smart quotes if present
+      .replace(/[^\x20-\x7E\s\n\r\t{}[\]":,.-]/g, '') // strip any weird Unicode control chars
+
+    planResult = JSON.parse(cleanedResponse) as PlanResultT
     // Ensure each item has a unique ID and proper fields
     planResult.items = planResult.items.map((item, index) => ({
       ...item,
@@ -175,8 +193,10 @@ export const processPlanRequest = async (
     }
   } catch (parseError) {
     // Fallback if JSON parsing fails
+    console.error('Error parsing AI response:', parseError)
     planResult = {
-      explanation: aiResponse,
+      explanation:
+        aiResponse.choices[0]?.message?.content || 'Error generating plan',
       items: [],
     }
   }

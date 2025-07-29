@@ -182,7 +182,7 @@ class MozQuestionAnswer extends LitElement {
   }
 
   handleIncomingMessage = async (message: any) => {
-    if (message.type !== 'ai_result') return
+    if (message.type !== 'page_qa_result') return
     const formattedResponse = await marked.parse(message.result)
     this.loading = false
     this.response = formattedResponse

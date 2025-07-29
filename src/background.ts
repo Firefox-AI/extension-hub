@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { MessageTypesT, MessagePageAssistT } from '../types'
+import { getPageQandAResponse } from './services/pageQandA'
 import { getPageAssistResponse } from './services/pageAssist'
 import { getHuggingFaceChatResponse } from './services/huggingface'
 import initContextMenus from './contextMenu'
@@ -38,11 +39,10 @@ browser.runtime.onMessage.addListener(
     const prompt = buildPrompt(message.data.prompt, message.data.textContent)
 
     if (message.type === 'page_qa') {
-      const result = await getPageAssistResponse(
-        message.data as MessagePageAssistT
-      )
+      const result = await getPageQandAResponse(prompt)
+
       browser.runtime.sendMessage({
-        type: 'ai_result',
+        type: 'page_qa_result',
         result: result,
       })
     }
