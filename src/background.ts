@@ -2,18 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { getHuggingFaceChatResponse } from './services/huggingface'
-import { getPageQandAResponse } from './services/pageQandA'
 import { MessageTypesT, MessagePageAssistT } from '../types'
-import { getPageAssistResponse } from './services/pageAssist'
-<<<<<<< HEAD
-=======
-import { getHuggingFaceChatResponse } from './services/huggingface'
 import { getPageQandAResponse } from './services/pageQandA'
-import { getPlanResponse } from './services/plan-checklist'
->>>>>>> 974f680 (generalizing openai service)
+import { getPageAssistResponse } from './services/pageAssist'
+import { getHuggingFaceChatResponse } from './services/huggingface'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
+import { getPlanResponse } from './services/plan-checklist'
 import { initEnvironment } from './systemConfig'
 
 browser.runtime.onInstalled.addListener(() => {
@@ -45,6 +40,7 @@ browser.runtime.onMessage.addListener(
 
     if (message.type === 'page_qa') {
       const result = await getPageQandAResponse(prompt)
+
       browser.runtime.sendMessage({
         type: 'page_qa_result',
         result: result,
