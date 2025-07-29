@@ -2,18 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { MessageTypesT } from '../types'
-import { getMlEngineAIResponse } from './services/mlEngine'
-import { getLocalModelResponse } from './services/localModel'
-import { getTogeatherAIResponse } from './services/togetherai'
-import {
-  getHuggingFaceResponse,
-  getHuggingFaceChatResponse,
-} from './services/huggingface'
+import { getHuggingFaceChatResponse } from './services/huggingface'
 import { getPageQandAResponse } from './services/pageQandA'
-import { getPlanResponse } from './services/plan-checklist'
+import { MessageTypesT, MessagePageAssistT } from '../types'
+import { getPageAssistResponse } from './services/pageAssist'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
+import { getPlanResponse } from './services/plan-checklist'
 import { initEnvironment } from './systemConfig'
 
 browser.runtime.onInstalled.addListener(() => {
@@ -39,7 +34,8 @@ const buildPrompt = (prompt: string, textContent: string) => {
  */
 browser.runtime.onMessage.addListener(
   async (message: { type: MessageTypesT; data: any }) => {
-    // TODO - probably need to diversify prompts based on type of request
+    // TODO - probably need to diversify prompts based on type of request, may need to
+    // set the patter to send textContent and prompt separately into each unique service
     const prompt = buildPrompt(message.data.prompt, message.data.textContent)
 
     if (message.type === 'page_qa') {
@@ -51,9 +47,10 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'page_summarize') {
-      const result = await getMlEngineAIResponse(prompt)
-      // const result = await getLocalModelResponse(prompt)
-      // const result = await getHuggingFaceResponse(prompt)
+      const result = await getPageAssistResponse(
+        message.data as MessagePageAssistT
+      )
+
       browser.runtime.sendMessage({
         type: 'page_summarize_result',
         result: result,
