@@ -99,7 +99,7 @@ export const getOpenAIResponseWithModel = async (prompt: string, model: string) 
     })
 
     const data = await response.json()
-    // console.log(`[OpenAI] Response data: ${JSON.stringify(data)}`)
+    console.log(`[OpenAI] Response data: ${JSON.stringify(data)}`)
     const content = data.output
       ?.filter((entry: any) => entry.content?.some((c: any) => c.type === 'output_text'))
       ?.flatMap((entry: any) => entry.content)

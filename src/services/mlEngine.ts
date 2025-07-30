@@ -115,7 +115,6 @@ export const getEmbedding = async (text: string): Promise<number[] | undefined> 
   await ensureEmbeddingEngineReady()
 
   try {
-    console.log('[embedding] requested for:', text)
     const trial = (browser as unknown as mlBrowserT).trial
     const result = await trial?.ml.runEngine({
       // featureId: 'smart-tab-embedding',
@@ -125,8 +124,6 @@ export const getEmbedding = async (text: string): Promise<number[] | undefined> 
         normalize: true,
       },
     })
-
-    console.log('[embedding] Raw result:', result)
 
     if (!result) {
       console.warn('[embedding] runEngine returned undefined or null')

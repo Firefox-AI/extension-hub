@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit'
 import { marked } from 'marked'
 
 class MozPlanner extends LitElement {
-  goal: string = '7-day trip to Tokyo'
+  goal: string = ''
   loading: boolean = false
   plan: string = ''
   planType: string = ''
@@ -218,13 +218,14 @@ class MozPlanner extends LitElement {
             <option value="event">Event</option>
             <option value="learning">Learning</option>
             <option value="project">Project</option>
+            <option value="generic">Generic</option>
           </select>
 
           <label class="label">I want to create a plan about ...</label>
           <textarea
             class="text-input"
             rows="3"
-            placeholder="e.g. 7-day trip to Tokyo"
+            placeholder="e.g. 7-day trip to Tokyo (family of 3 with a 5-year-old boy)"
             .value=${this.goal}
             .disabled=${this.loading || this.plan !== ''}
             @input=${this.handleInput}

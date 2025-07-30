@@ -6,7 +6,7 @@ import { getEmbedding } from './mlEngine'
 
 const OPENAI_SUMMARY_AND_FOLLOWUP_MODEL = 'gpt-4.1-mini'
 const OPENAI_REASON_MODEL = 'o4-mini'
-const MAX_HISTORY_RETRIEVAL = 20
+const MAX_HISTORY_RETRIEVAL = 50
 const HISTORY_SIMILARITY_THRESHOLD = 0.5
 const MAX_RELEVANT_HISTORY = 5
 
@@ -22,8 +22,8 @@ const MAX_RELEVANT_HISTORY = 5
 let conversationHistory: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
     {
         "role": 'system',
-        "content": `You are a planning assistant that helps users refine and expand structured plans based on their browsing history and original goal.
-The user has already received an initial plan (see below). You are now engaged to handle follow-up questions, requests for changes, or additions.
+        "content": `You are a planning assistant that helps users refine and expand a structured plan based on their browsing history and original goal.
+The user has already received an initial plan (see below). You are now engaged to handle follow-up questions and requests for changes or additions.
 
 Your responsibilities:
 - Understand the user's feedback or questions in the context of the original goal and plan.
@@ -78,6 +78,7 @@ export async function getPlannerResponse(input: string, type: string, isFollowup
         }
 
         // Step 2
+        // TODO: remove google search pages since sometimes the search term is in title and affects the ranking.
         console.log(`[planner] Filtering history items based on goal: ${input}`)
         const topicEmbedding = await getEmbedding(input)
         if (!topicEmbedding) {
@@ -206,22 +207,32 @@ export const cosineSimilarity = (a: number[], b: number[]): number => {
 
 
 function constructPlannerPrompt(goal: string, type: string, content: string[]): string {
-    return `You are a planning assistant generating a detailed, well-balanced ${type} plan about ${goal} based on real user research.
-The user has researched the following places and comprehensive summaries of their content is provided below:
+    return `You are a planning assistant generating a clear, structured, and goal-aligned ${type} plan for the following objective:
+  
+${goal}
+
+The user has already conducted research on this topic, and the following summaries capture relevant information from their browsing activity:
 
 ${content.join('\n\n')}
 
-    Your task is to:
-- Think step-by-step to select activities for the plan
-- For each activity, consider:
-  - Why it fits the user's goal
-  - When it makes the most sense in the trip (morning, afternoon, evening)
-  - How long it might take
-  - How it connects with nearby or related activities
-  - If two activities might conflict (e.g. location or time), make trade-offs and explain your decision
-- Prioritize content from the user's summaries — do not invent unrelated activities
-- Consider walking distances and grouping of nearby attractions
-- Sequence activities into a complete and feasible plan that covers the entire trip
-- Keep each day realistic (6-8 hours total activities)
-- Avoid repetition, overbooking, or unnecessary transit`
+Your task is to use this information to create a thoughtful and feasible plan.
+
+Follow these principles:
+- Think step-by-step to break down the user's goal into actionable, logically ordered tasks or activities.
+- For each task or activity, consider:
+  - Why it directly contributes to achieving the user's goal
+  - When it makes the most sense to include it (e.g., time of day, sequence, phase, or dependency)
+  - How long it might take or how much effort it requires
+  - How it relates to other items in the plan (e.g. overlaps, complementarities, conflicts)
+  - If there are conflicts (time, resource, cognitive load), resolve them and explain your reasoning
+- Use only the user's summarized research to inform your recommendations — do not invent external content
+- Organize the plan into a complete, efficient structure that spans the full scope or time period the user implies
+- Be realistic about what can be accomplished based on the plan type (e.g., daily time limits, focus span, preparation time)
+- Avoid redundancy, overcommitment, or unnecessary switching between tasks or locations
+
+Once you've reasoned through the structure:
+- Present the final plan in a **clean, structured format** (e.g., organized by day, phase, or section)
+- Do **not include excessive reasoning, internal thoughts or validations of requirements in the final output** — keep it focused and actionable
+- Finally, end with a question asking for user's feedback or if they want to make any changes to the plan.
+  `
 }
