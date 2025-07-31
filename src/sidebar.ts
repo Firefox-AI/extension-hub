@@ -1,3 +1,4 @@
+import MozAttributeComparison from './features/MozAttributeComparison'
 import MozQuestionAnswer from './features/MozQuestionAnswer'
 import MozPageSummarization from './features/page-summarization/MozPageSummarization'
 import MozTabs from './features/MozTabs'
@@ -7,6 +8,7 @@ import MozPlanner from './features/planner/MozPlanner'
 import MozPlanChecklist from './features/MozPlanChecklist'
 import MozTabsDebug from './features/MozTabsDebug'
 
+customElements.define('moz-attribute-comparison', MozAttributeComparison)
 customElements.define('moz-question-answer', MozQuestionAnswer)
 customElements.define('moz-extension-hub', ExtensionHub)
 customElements.define('moz-page-summarization', MozPageSummarization)
