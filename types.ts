@@ -47,7 +47,7 @@ export type PromptDataT = {
 export type EngineMetadataT = {
   taskName: string
   modelHub?: string
-  modelId: string
+  modelId?: string
   modelFile?: string
   modelHubRootUrl?: string
   modelHubUrlTemplate?: string
@@ -96,7 +96,8 @@ export type PromptT = {
 
 // It's not clear what other values are on this type add as needed
 export type RunEngineMetadataT = {
-  prompt: PromptT[]
+  args?: any
+  prompt?: PromptT[]
   nPredict?: number
   skipPrompt?: boolean
 }

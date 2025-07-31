@@ -5,6 +5,7 @@ import './MozEngineWarning'
 
 type FeatureOption = {
   value:
+    | 'attribute_comparison'
     | 'chat'
     | 'page_qa'
     | 'page_summarization'
@@ -41,6 +42,11 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     value: 'plan_checklist',
     label: 'Planner Checklist',
     component: () => html`<moz-plan-checklist></moz-plan-checklist>`,
+  },
+  {
+    value: 'attribute_comparison',
+    label: 'Attribute Comparison',
+    component: () => html`<moz-attribute-comparison></moz-attribute-comparison>`,
   },
   {
     value: 'tabs_debug',
