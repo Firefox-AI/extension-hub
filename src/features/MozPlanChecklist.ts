@@ -3,11 +3,19 @@ import { repeat } from 'lit/directives/repeat.js'
 import { mlBrowserT, TabsCollectionT, TabsT } from '../../types'
 import {
   PLANNER_PROMPTS,
+  PLANNER_TYPES,
   PlanDataT,
   PlanItemT,
   PlanResultT,
   PlannerType,
 } from '../services/plan-checklist'
+import { MlEngineService } from '../services/mlEngine'
+
+type ClassificationResultT = {
+  sequence: string
+  labels: string[]
+  scores: number[]
+}
 
 class MozPlanChecklist extends LitElement {
   tabs: TabsCollectionT | null = null
@@ -17,6 +25,10 @@ class MozPlanChecklist extends LitElement {
   customPrompt: string = ''
   planResult: PlanResultT | null = null
   isLoading: boolean = false
+  isClassifying: boolean = false
+  classificationScore: number = 0
+
+  private mlEngineService: MlEngineService
 
   static properties = {
     tabs: { type: Object },
@@ -26,6 +38,8 @@ class MozPlanChecklist extends LitElement {
     customPrompt: { type: String },
     planResult: { type: Object },
     isLoading: { type: Boolean },
+    isClassifying: { type: Boolean },
+    classificationScore: { type: Number },
   }
 
   static styles = css`
@@ -300,6 +314,11 @@ class MozPlanChecklist extends LitElement {
 
   constructor() {
     super()
+    this.mlEngineService = new MlEngineService({
+      modelHub: 'huggingface',
+      modelId: 'Xenova/mobilebert-uncased-mnli',
+      taskName: 'zero-shot-classification',
+    })
     this.loadTabs()
     this.setupMessageListener()
   }
@@ -317,7 +336,7 @@ class MozPlanChecklist extends LitElement {
   }
 
   loadTabs = async () => {
-    this.tabs = await (browser as unknown as mlBrowserT).extensionHub.getTabs()
+    this.tabs = await ((browser as unknown) as mlBrowserT).extensionHub.getTabs()
     this.initializeSelectedTabs()
   }
 
@@ -333,10 +352,11 @@ class MozPlanChecklist extends LitElement {
     })
 
     this.selectedTabs = newSelectedTabs
+    this.classifyPlannerType()
   }
 
   setupMessageListener = () => {
-    browser.runtime.onMessage.addListener((message) => {
+    browser.runtime.onMessage.addListener(message => {
       if (message.type === 'plan_check_result') {
         this.planResult = message.result
         this.isLoading = false
@@ -362,6 +382,7 @@ class MozPlanChecklist extends LitElement {
       [tabKey]: !this.selectedTabs[tabKey],
     }
     this.requestUpdate()
+    this.classifyPlannerType()
   }
 
   getSelectedTabsContent = (): string => {
@@ -373,7 +394,7 @@ class MozPlanChecklist extends LitElement {
     currentTabSet.forEach((tab, index) => {
       const tabKey = `${this.selectedTabSet}-${index}`
       if (this.selectedTabs[tabKey]) {
-        selectedTabsContent.push(`${tab.title}: ${tab.url}`)
+        selectedTabsContent.push(`${tab.title}`)
       }
     })
 
@@ -383,6 +404,47 @@ class MozPlanChecklist extends LitElement {
   handleCustomPromptChange = (event: Event) => {
     const textarea = event.target as HTMLTextAreaElement
     this.customPrompt = textarea.value
+  }
+
+  classifyPlannerType = async () => {
+    if (!this.tabs) return
+
+    const tabsContent = this.getSelectedTabsContent()
+    if (!tabsContent.trim()) {
+      return
+    }
+
+    const labels = Object.values(PLANNER_TYPES)
+
+    try {
+      this.isClassifying = true
+      const classificationResult = await this.mlEngineService.getAIResponse<
+        ClassificationResultT
+      >({
+        args: [tabsContent.slice(0, 2000), labels],
+      })
+
+      if (classificationResult && classificationResult.scores.length > 0) {
+        const bestLabel = classificationResult.labels[0]
+        const bestScore = classificationResult.scores[0]
+        const newPlannerType = Object.keys(PLANNER_TYPES).find(
+          key => PLANNER_TYPES[key as PlannerType] === bestLabel,
+        ) as PlannerType | undefined
+
+        if (newPlannerType) {
+          if (bestScore < 0.25) {
+            this.plannerType = 'generic'
+          } else {
+            this.plannerType = newPlannerType
+          }
+          this.classificationScore = bestScore
+        }
+      }
+    } catch (err) {
+      console.error('Error during planner type classification:', err)
+    } finally {
+      this.isClassifying = false
+    }
   }
 
   sendPlanRequest = (existingPlan?: PlanResultT) => {
@@ -420,7 +482,7 @@ class MozPlanChecklist extends LitElement {
   handleItemToggle = (itemId: string) => {
     if (!this.planResult) return
 
-    this.planResult.items = this.planResult.items.map((item) =>
+    this.planResult.items = this.planResult.items.map(item =>
       item.id === itemId ? { ...item, completed: !item.completed } : item,
     )
     this.requestUpdate()
@@ -447,17 +509,32 @@ class MozPlanChecklist extends LitElement {
           <div class="controls-section">
             <div class="inline-fields">
               <div class="inline-field">
-                <label class="label">Planner Type:</label>
+                <label class="label"
+                  >Planner Type:
+                  ${this.isClassifying
+                    ? html`
+                        <i>(…)</i>
+                      `
+                    : this.classificationScore > 0
+                    ? html`
+                        <span style="color: #888; font-weight: normal;">
+                          (${Math.round(this.classificationScore * 100)}%)
+                        </span>
+                      `
+                    : ''}</label
+                >
                 <select
                   class="select"
                   @change="${this.handlePlannerTypeChange}"
                   .value="${this.plannerType}"
                   title="${PLANNER_PROMPTS[this.plannerType]}"
                 >
-                  <option value="trip">Trip Plan</option>
-                  <option value="shopping">Shopping Plan</option>
-                  <option value="party">Party Plan</option>
-                  <option value="generic">Generic Plan</option>
+                  ${Object.entries(PLANNER_TYPES).map(
+                    ([key, value]) =>
+                      html`
+                        <option value="${key}">${value}</option>
+                      `,
+                  )}
                 </select>
               </div>
 
@@ -469,7 +546,7 @@ class MozPlanChecklist extends LitElement {
                   .value="${this.selectedTabSet}"
                 >
                   ${tabSetOptions.map(
-                    (option) => html`
+                    option => html`
                       <option
                         value="${option}"
                         ?selected="${option === this.selectedTabSet}"
@@ -527,6 +604,11 @@ class MozPlanChecklist extends LitElement {
             </button>
           </div>
 
+          ${this.isLoading
+            ? html`
+                <div class="loader">Loading...</div>
+              `
+            : ''}
           ${this.planResult
             ? html`
                 <div class="plan-result">
@@ -544,8 +626,8 @@ class MozPlanChecklist extends LitElement {
                   <div class="checklist">
                     ${repeat(
                       this.planResult.items,
-                      (item) => item.id,
-                      (item) => html`
+                      item => item.id,
+                      item => html`
                         <div class="plan-item">
                           <div class="plan-item-content">
                             <label class="checkbox-label">
