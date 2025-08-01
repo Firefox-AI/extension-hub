@@ -1,7 +1,7 @@
 import { TabsCollectionT } from '../../types'
 import { getOpenAIResponse } from './openai'
 
-export type PlannerType = 'trip' | 'shopping' | 'party' | 'generic'
+export type PlannerType = 'trip' | 'shopping' | 'party' | 'food' | 'generic'
 
 export type PlanItemT = {
   completed: boolean
@@ -31,7 +31,16 @@ export const PLANNER_PROMPTS = {
   trip: 'Create a detailed trip itinerary and planning checklist',
   shopping: 'Create a comprehensive shopping plan and checklist',
   party: 'Create a detailed party planning checklist and timeline',
+  food: 'Create a detailed meal plan and grocery list',
   generic: 'Create a comprehensive plan and checklist',
+}
+
+export const PLANNER_TYPES: { [key in PlannerType]: string } = {
+  trip: 'Trip Plan',
+  shopping: 'Shopping Plan',
+  party: 'Party Plan',
+  food: 'Meal Plan',
+  generic: 'Generic Plan',
 }
 
 const buildPlanPrompt = (
@@ -46,15 +55,15 @@ const buildPlanPrompt = (
   }
 
   if (existingPlan) {
-    const completedItems = existingPlan.items.filter((item) => item.completed)
-    const pendingItems = existingPlan.items.filter((item) => !item.completed)
+    const completedItems = existingPlan.items.filter(item => item.completed)
+    const pendingItems = existingPlan.items.filter(item => !item.completed)
 
     prompt += `\n\nThis is an UPDATE to an existing plan. Here's the original plan context:\n\nORIGINAL PLAN: "${
       existingPlan.explanation
     }"\n\nCOMPLETED ITEMS (preserve these unless truly obsolete):\n${completedItems
-      .map((item) => `- ${item.text}`)
+      .map(item => `- ${item.text}`)
       .join('\n')}\n\nPENDING ITEMS:\n${pendingItems
-      .map((item) => `- ${item.text}`)
+      .map(item => `- ${item.text}`)
       .join(
         '\n',
       )}\n\nIMPORTANT:\n- Keep all completed items unless they're truly no longer relevant\n- Update pending items based on the new browser tabs context\n- Add new relevant items if the updated tabs suggest additional tasks\n- Maintain the overall plan coherence while incorporating new information\n- Focus on providing updated next steps and refined task descriptions`
@@ -73,13 +82,13 @@ const findMatchingItem = (
 ): PlanItemT | null => {
   // Strategy 1: Exact text match
   let match = existingItems.find(
-    (existing) =>
+    existing =>
       existing.text.toLowerCase().trim() === newItem.text.toLowerCase().trim(),
   )
   if (match) return match
 
   // Strategy 2: Strong substring match (both directions, 50%+ overlap)
-  match = existingItems.find((existing) => {
+  match = existingItems.find(existing => {
     const existingText = existing.text.toLowerCase()
     const newText = newItem.text.toLowerCase()
     const minLength = Math.min(existingText.length, newText.length)
@@ -97,13 +106,13 @@ const findMatchingItem = (
     text
       .toLowerCase()
       .split(/[\s\-_.,!?;:()[\]{}]+/)
-      .filter((word) => word.length > 3)
+      .filter(word => word.length > 3)
       .slice(0, 5) // Top 5 keywords
 
   const newKeywords = getKeywords(newItem.text)
-  match = existingItems.find((existing) => {
+  match = existingItems.find(existing => {
     const existingKeywords = getKeywords(existing.text)
-    const commonKeywords = newKeywords.filter((keyword) =>
+    const commonKeywords = newKeywords.filter(keyword =>
       existingKeywords.includes(keyword),
     )
     return commonKeywords.length >= 2 // At least 2 common keywords
@@ -150,11 +159,11 @@ export const processPlanRequest = async (
     // Enhanced merging logic for updates
     if (existingPlan) {
       const existingItems = existingPlan.items
-      const existingCompleted = existingItems.filter((item) => item.completed)
-      const existingPending = existingItems.filter((item) => !item.completed)
+      const existingCompleted = existingItems.filter(item => item.completed)
+      const existingPending = existingItems.filter(item => !item.completed)
 
       // Process each new item with smarter matching
-      planResult.items = planResult.items.map((newItem) => {
+      planResult.items = planResult.items.map(newItem => {
         const matchingCompleted = findMatchingItem(newItem, existingCompleted)
         const matchingPending = findMatchingItem(newItem, existingPending)
 
@@ -179,8 +188,8 @@ export const processPlanRequest = async (
       })
 
       // Always preserve completed items that weren't matched/updated
-      const newItemIds = planResult.items.map((item) => item.id)
-      existingCompleted.forEach((existing) => {
+      const newItemIds = planResult.items.map(item => item.id)
+      existingCompleted.forEach(existing => {
         if (!newItemIds.includes(existing.id)) {
           // Add back unmatched completed items
           planResult.items.push({
