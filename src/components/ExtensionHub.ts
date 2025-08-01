@@ -7,6 +7,7 @@ type FeatureOption = {
   value:
     | 'attribute_comparison'
     | 'chat'
+    | 'conversational_onboarding'
     | 'page_qa'
     | 'page_summarization'
     | 'plan_checklist'
@@ -18,6 +19,11 @@ type FeatureOption = {
 }
 
 const FEATURE_OPTIONS: FeatureOption[] = [
+  {
+    value: 'conversational_onboarding',
+    label: 'Conversational Onboarding',
+    component: () => html`<moz-conversational-onboarding></moz-conversational-onboarding>`,
+  },
   {
     value: 'page_qa',
     label: 'Page Q&A',
