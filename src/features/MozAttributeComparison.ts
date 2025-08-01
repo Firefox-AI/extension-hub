@@ -39,7 +39,9 @@ class MozAttributeComparison extends LitElement {
   constructor() {
     super()
     this.mlEngineService = new MlEngineService({
+      modelHub: "huggingface",
       taskName: 'zero-shot-classification',
+      modelId: 'Xenova/mobilebert-uncased-mnli',
     })
   }
 
