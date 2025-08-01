@@ -33,4 +33,5 @@ export enum LocalStorageKeys {
 
 export enum SessionStorageKeys {
   ENGINE_CREATED = 'engine_created',
+  EMBEDDING_ENGINE_CREATED = 'embedding_engine_created',
 }
