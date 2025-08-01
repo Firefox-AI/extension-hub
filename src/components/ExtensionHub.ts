@@ -8,13 +8,13 @@ type FeatureOption = {
     | 'attribute_comparison'
     | 'chat'
     | 'conversational_onboarding'
+    | 'extensionhub_dashboard'
     | 'page_qa'
     | 'page_summarization'
     | 'plan_checklist'
     | 'tab_summarization'
     | 'planner'
     | 'tabs_debug'
-    | 'extensionhub_dashboard'
   label: string
   component: () => unknown
 }

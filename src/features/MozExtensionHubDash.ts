@@ -13,10 +13,10 @@ class MozExtensionHubDash extends LitElement {
     super.connectedCallback()
   }
 
-  async handlePageClick() {
+  async handlePageClick(page: string) {
     browser.runtime.sendMessage({
       type: 'pages_open',
-      data: 'open_pages',
+      data: { page },
     })
   }
 
@@ -25,8 +25,17 @@ class MozExtensionHubDash extends LitElement {
       <div class="wrapper">
         <div class="container">
           <h3 class="title">Extension Hub Dashboard</h3>
-          <button class="settings-button" @click="${this.handlePageClick}">
-            Open page
+          <button
+            class="settings-button"
+            @click="${() => this.handlePageClick('chat.html')}"
+          >
+            Open chat page
+          </button>
+          <button
+            class="settings-button"
+            @click="${() => this.handlePageClick('onboarding.html')}"
+          >
+            Open onboarding page
           </button>
         </div>
       </div>
@@ -65,6 +74,25 @@ class MozExtensionHubDash extends LitElement {
         flex-direction: column;
         border-radius: 8px;
         font-size: 14px;
+        gap: 10px;
+      }
+
+      .title {
+        margin: 0;
+      }
+
+      .settings-button {
+        background-color: transparent;
+        border: 1px solid var(--color-fg);
+        color: var(--color-fg);
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .settings-button:hover {
+        background-color: rgba(255, 255, 255, 0.1);
       }
     `
   }

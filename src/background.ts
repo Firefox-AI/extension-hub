@@ -99,8 +99,7 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'pages_open') {
-      // this could scale to pass a param to say what page to open?
-      pageLauncher()
+      pageLauncher(message.data.page)
     }
   },
 )

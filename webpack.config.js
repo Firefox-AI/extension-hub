@@ -12,11 +12,10 @@ module.exports = {
         type: 'this',
       },
     },
-    content: './src/content.ts',
-    sidebar: './src/sidebar.ts',
     background: './src/background.ts',
+    content: './src/content.ts',
+    elements: './src/elements.ts',
     settings: './src/settings.ts',
-    pages: './src/pages.ts',
   },
   output: {
     filename: '[name].js',
