@@ -41,7 +41,7 @@ const FEATURE_OPTIONS: FeatureOption[] = [
   },
   {
     value: 'planner',
-    label: 'Planner',
+    label: 'Planner History',
     component: () => html`<moz-planner></moz-planner>`,
   },
   {
