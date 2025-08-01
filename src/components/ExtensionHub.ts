@@ -5,11 +5,14 @@ import './MozEngineWarning'
 
 type FeatureOption = {
   value:
+    | 'attribute_comparison'
     | 'chat'
+    | 'conversational_onboarding'
     | 'page_qa'
     | 'page_summarization'
     | 'plan_checklist'
     | 'tab_summarization'
+    | 'planner'
     | 'tabs_debug'
     | 'extensionhub_dashboard'
   label: string
@@ -17,6 +20,11 @@ type FeatureOption = {
 }
 
 const FEATURE_OPTIONS: FeatureOption[] = [
+  {
+    value: 'conversational_onboarding',
+    label: 'Conversational Onboarding',
+    component: () => html`<moz-conversational-onboarding></moz-conversational-onboarding>`,
+  },
   {
     value: 'page_qa',
     label: 'Page Q&A',
@@ -39,9 +47,19 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     component: () => html`<moz-chat></moz-chat>`,
   },
   {
+    value: 'planner',
+    label: 'Planner History',
+    component: () => html`<moz-planner></moz-planner>`,
+  },
+  {
     value: 'plan_checklist',
     label: 'Planner Checklist',
     component: () => html`<moz-plan-checklist></moz-plan-checklist>`,
+  },
+  {
+    value: 'attribute_comparison',
+    label: 'Attribute Comparison',
+    component: () => html`<moz-attribute-comparison></moz-attribute-comparison>`,
   },
   {
     value: 'tabs_debug',

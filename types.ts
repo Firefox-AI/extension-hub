@@ -38,6 +38,10 @@ export type MessageTypesT =
   | 'chat_message'
   | 'chat_message_result'
   | 'pages_open'
+  | 'planner'
+  | 'planner_result'
+  | 'planner_followup'
+
 
 export type PromptDataT = {
   prompt: string
@@ -48,7 +52,7 @@ export type PromptDataT = {
 export type EngineMetadataT = {
   taskName: string
   modelHub?: string
-  modelId: string
+  modelId?: string
   modelFile?: string
   modelHubRootUrl?: string
   modelHubUrlTemplate?: string
@@ -97,7 +101,9 @@ export type PromptT = {
 
 // It's not clear what other values are on this type add as needed
 export type RunEngineMetadataT = {
-  prompt: PromptT[]
+  args?: any
+  options?: any
+  prompt?: PromptT[]
   nPredict?: number
   skipPrompt?: boolean
 }

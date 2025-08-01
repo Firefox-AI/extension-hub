@@ -40,5 +40,9 @@ module.exports = {
     ],
   },
   devtool: 'cheap-module-source-map',
-  plugins: [new Dotenv({})],
+  plugins: [
+    new Dotenv({
+      safe: false
+    }),
+  ],
 }

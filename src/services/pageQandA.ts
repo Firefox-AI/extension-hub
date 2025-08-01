@@ -1,6 +1,14 @@
 import { getOpenAIResponse } from './openai'
 
-export const getPageQandAResponse = async (prompt: string): Promise<string> => {
+const buildPrompt = (prompt: string, textContent: string) => {
+  return `answer this question:${prompt}, with this data :${textContent}`
+}
+
+
+export const getPageQandAResponse = async (input_prompt :string, textContent: string): Promise<string> => {
+
+  const prompt = buildPrompt(input_prompt, textContent)
+  
   const response = await getOpenAIResponse({
     messages: [
       {

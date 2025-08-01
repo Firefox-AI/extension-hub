@@ -3,7 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { getTogeatherAIResponse } from './togetherai'
 
-export const summarizeTabs = async (prompt: string) => {
+const buildPrompt = (prompt: string, textContent: string) => {
+  return `answer this question:${prompt}, with this data :${textContent}`
+}
+
+export const summarizeTabs = async (input_prompt: string, textContent: string) => {
+  const prompt = buildPrompt(input_prompt, textContent)
+
   // Dive more into the conifguration options here:
   const items = await browser.history.search({
     text: '',
