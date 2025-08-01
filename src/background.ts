@@ -20,26 +20,13 @@ browser.runtime.onInstalled.addListener(() => {
 })
 
 /**
- * Get AI response for the given prompt and full text.
- * @param data
- * @returns
- */
-
-const buildPrompt = (prompt: string, textContent: string) => {
-  return `answer this question:${prompt}, with this data :${textContent}`
-}
-
-/**
  * Event Listeners
  */
 browser.runtime.onMessage.addListener(
   async (message: { type: MessageTypesT; data: any }) => {
-    // TODO - probably need to diversify prompts based on type of request, may need to
-    // set the patter to send textContent and prompt separately into each unique service
-    const prompt = buildPrompt(message.data.prompt, message.data.textContent)
 
     if (message.type === 'page_qa') {
-      const result = await getPageQandAResponse(prompt)
+      const result = await getPageQandAResponse(message.data.prompt, message.data.textContent)
 
       browser.runtime.sendMessage({
         type: 'page_qa_result',
@@ -62,7 +49,7 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'tab_summarize') {
-      const result = await summarizeTabs(prompt)
+      const result = await summarizeTabs(message.data.prompt, message.data.textContent)
       browser.runtime.sendMessage({
         type: 'tab_summarize_result',
         result: result,
