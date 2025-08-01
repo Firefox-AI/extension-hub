@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit'
 import { PageContentT } from '../../types'
 import { MlEngineService } from '../services/mlEngine'
+import { getOpenAIResponse } from '../services/openai'
 
 const DEFAULT_ATTRIBUTES = [
   'Safety ratings and certifications',
@@ -15,6 +16,67 @@ const DEFAULT_ATTRIBUTES = [
   'Wheel size',
 ].join('\n')
 
+const DEFAULT_INTENT = "buy baby strollers"
+const criteriaPromptTemplate = ({ userRequest }: { userRequest: string }) => `
+You are a shopping expert model.
+
+When considering the topic of ${userRequest}, there are several quality criteria that are relevant, frequently considered and cover a broad range of perspectives. These criteria help shoppers choose the most suitable product for their needs.
+On top of the criteria add 5 more different, more diverse and more important.
+
+## Output:
+Return a list of 10+ quality criteria that match the user’s request and any relevant use case.
+Use one line per item, starting each with a dash or number. **Do not** include explanations, reasons, or annotations. Just the list of important criteria.
+`
+const getImportantCriteriaFromOpenAI = async (
+  userRequest: string,
+  model = 'gpt-4o',
+  temperature = 0.2,
+  max_tokens = 256
+): Promise<string[]> => {
+  console.log("inside getImportantCriteriaFromOpenAI");
+  const prompt = criteriaPromptTemplate({ userRequest })
+
+  const response = await getOpenAIResponse({
+    model,
+    temperature,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a helpful assistant that produces criteria as a numbered list without explanation.',
+      },
+      { role: 'user', content: prompt },
+    ],
+  })
+
+  console.log(`response = ${JSON.stringify(response)}`)
+
+  const raw = response?.choices?.[0]?.message?.content || ''
+
+  const lines = raw
+    .split('\n')
+    .map((line: string) => line.trim())
+    .filter((line: string) => line && /^[-\d]/.test(line))
+
+  const criteria = lines.map((line: string) => line.replace(/^[-*\d.\s]+/, '').trim())
+
+
+  // Deduplicate and clean
+  const seen = new Set<string>()
+  const unique = criteria.filter((item: string) => {
+    if (seen.has(item)) return false
+    seen.add(item)
+    return true
+  })
+
+  return unique
+}
+
+export const getTopKCriteria = (criteria: string[], k = 5): string[] => {
+  return criteria
+    .filter(q => q && !q.endsWith(':') && !q.endsWith(',') && !/\(\s*$/.test(q))
+    .slice(0, k)
+}
+
 type ClassificationResultT = {
   sequence: string
   labels: string[]
@@ -23,6 +85,7 @@ type ClassificationResultT = {
 
 class MozAttributeComparison extends LitElement {
   attrs: string = DEFAULT_ATTRIBUTES
+  intent: string = DEFAULT_INTENT
   isLoading: boolean = false
   result: ClassificationResultT | null = null
   error: string | null = null
@@ -200,6 +263,25 @@ class MozAttributeComparison extends LitElement {
     this.attrs = textarea.value
   }
 
+  handleIntentChange = async (event: Event) => {
+    const textarea = event.target as HTMLTextAreaElement
+    this.intent = textarea.value
+    console.log(`this.intent = ${this.intent}`)
+    // new openAI call to get the criteria to fill this.attrs
+
+    try {
+      const criteria = await getImportantCriteriaFromOpenAI(this.intent)
+      console.log(`criteria = ${JSON.stringify(criteria)}`);
+      this.attrs = criteria.join('\n')
+      if (this.attrs.length === 0) {
+        this.attrs = DEFAULT_ATTRIBUTES
+      }
+    } catch (err) {
+      console.error('Failed to fetch criteria from OpenAI:', err)
+      this.error = 'Could not generate attribute criteria from AI'
+    }
+  }
+
   handleCompare = async () => {
     this.isLoading = true
     this.result = null
@@ -271,6 +353,14 @@ class MozAttributeComparison extends LitElement {
         <div class="container">
           <div class="controls-section">
             <div class="field">
+
+              <label class="label">User intent (buy strollers):</label>
+              <textarea
+                class="text-area"
+                @input="${this.handleIntentChange}"
+                .value="${this.intent}"
+              ></textarea>
+
               <label class="label">Attributes (one per line):</label>
               <textarea
                 class="text-area"
