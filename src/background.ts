@@ -24,6 +24,7 @@ browser.runtime.onInstalled.addListener(() => {
  */
 browser.runtime.onMessage.addListener(
   async (message: { type: MessageTypesT; data: any }) => {
+    console.log('[BG] Received message:', message)
 
     if (message.type === 'page_qa') {
       const result = await getPageQandAResponse(message.data.prompt, message.data.textContent)
