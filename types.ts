@@ -37,6 +37,9 @@ export type MessageTypesT =
   | 'tab_summarize_result'
   | 'chat_message'
   | 'chat_message_result'
+  | 'planner'
+  | 'planner_result'
+  | 'planner_followup'
 
 export type PromptDataT = {
   prompt: string

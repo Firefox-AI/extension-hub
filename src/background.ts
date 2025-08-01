@@ -6,6 +6,7 @@ import { MessageTypesT, MessagePageAssistT } from '../types'
 import { getPageQandAResponse } from './services/pageQandA'
 import { getPageAssistResponse } from './services/pageAssist'
 import { getHuggingFaceChatResponse } from './services/huggingface'
+import { getPlannerResponse} from './services/planner'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
 import { getPlanResponse } from './services/plan-checklist'
@@ -50,6 +51,7 @@ browser.runtime.onMessage.addListener(
 
     if (message.type === 'tab_summarize') {
       const result = await summarizeTabs(message.data.prompt, message.data.textContent)
+
       browser.runtime.sendMessage({
         type: 'tab_summarize_result',
         result: result,
@@ -62,6 +64,28 @@ browser.runtime.onMessage.addListener(
         type: 'chat_message_result',
         result: result,
       })
+    }
+    
+    /* Planner
+     */
+    if (message.type === 'planner') {
+      // Initial planner request
+      const result = await getPlannerResponse(message.data.goal, message.data.type, false)
+      browser.runtime.sendMessage({
+        type: 'planner_result',
+        result,
+      })
+      return true
+    }
+
+    if (message.type === 'planner_followup') {
+      // Follow-up input, continue conversation
+      const result = await getPlannerResponse(message.data.followup, message.data.type, true)
+      browser.runtime.sendMessage({
+        type: 'planner_result',
+        result,
+      })
+      return true
     }
 
     if (message.type === 'plan_check_request') {
