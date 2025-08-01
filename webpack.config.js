@@ -16,6 +16,7 @@ module.exports = {
     sidebar: './src/sidebar.ts',
     background: './src/background.ts',
     settings: './src/settings.ts',
+    pages: './src/pages.ts',
   },
   output: {
     filename: '[name].js',
@@ -39,8 +40,5 @@ module.exports = {
     ],
   },
   devtool: 'cheap-module-source-map',
-  plugins: [
-    new Dotenv({
-    }),
-  ],
+  plugins: [new Dotenv({})],
 }

@@ -52,6 +52,11 @@
     "default_panel": "sidebar/sidebar.html",
     "default_icon": "assets/icon.svg"
   },
+  "web_accessible_resources": [
+    "pages/*.html",
+    "dist/*"
+  ],
+  
   "content_scripts": [
     {
       "matches": [

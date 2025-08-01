@@ -21,7 +21,7 @@ export type mlBrowserT = {
   tabGroups: {
     update: (
       id: number,
-      options: { title: string; color: string }
+      options: { title: string; color: string },
     ) => Promise<void>
   }
 }
@@ -37,6 +37,7 @@ export type MessageTypesT =
   | 'tab_summarize_result'
   | 'chat_message'
   | 'chat_message_result'
+  | 'pages_open'
 
 export type PromptDataT = {
   prompt: string

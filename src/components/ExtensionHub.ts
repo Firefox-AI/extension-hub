@@ -11,6 +11,7 @@ type FeatureOption = {
     | 'plan_checklist'
     | 'tab_summarization'
     | 'tabs_debug'
+    | 'extensionhub_dashboard'
   label: string
   component: () => unknown
 }
@@ -46,6 +47,11 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     value: 'tabs_debug',
     label: 'Tabs Debug',
     component: () => html`<moz-tabs-debug></moz-tabs-debug>`,
+  },
+  {
+    value: 'extensionhub_dashboard',
+    label: 'Extension Hub Dashboard',
+    component: () => html`<moz-extension-hub-dash></moz-extension-hub-dash>`,
   },
 ]
 
@@ -102,7 +108,7 @@ class MozExtensionHub extends LitElement {
                   ?selected=${this.feature === opt.value}
                 >
                   ${opt.label}
-                </option>`
+                </option>`,
             )}
           </select>
           <button class="settings-button" @click="${this.handleSettingsClick}">
