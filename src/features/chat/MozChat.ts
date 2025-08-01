@@ -11,15 +11,13 @@ class MozChat extends LitElement {
   messages: ChatMessageT[] = []
   inputValue = ''
   loading = false
-  hasSystemMessage = false
-  includePageContent = true
+  hasSystemMessage = true  // disabling this for the time being -- see not below
 
   static get properties() {
     return {
       messages: { type: Array },
       inputValue: { type: String },
       loading: { type: Boolean },
-      includePageContent: { type: Boolean },
     }
   }
 
@@ -38,13 +36,11 @@ class MozChat extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'chat_message_result') {
+      console.log("[handleIncomingMessage]", message)
       const response = message.result
       this.loading = false
 
-      this.messages = [
-        ...this.messages,
-        { role: 'assistant', content: response },
-      ]
+      this.messages = [ ...this.messages, { role: 'assistant', content: response }]
       this.updated()
       // Scroll to bottom after new message
       this.updateComplete.then(() => {
@@ -52,6 +48,25 @@ class MozChat extends LitElement {
       })
     }
   }
+
+  async fetchPageContent(): Promise<{
+      textContent: string
+      siteName: string
+    } | null> {
+      const [tab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      })
+
+      const pageContent = tab?.id
+        ? await browser.tabs.sendMessage(tab.id, {
+            type: 'get_page_content',
+            data: {},
+          })
+        : null
+
+      return pageContent
+    }
 
   // Load stored chat history from browser.storage.local
   async loadHistory() {
@@ -75,27 +90,8 @@ class MozChat extends LitElement {
       .catch(console.error)
   }
 
-  async fetchPageContent(): Promise<{
-    textContent: string
-    siteName: string
-  } | null> {
-    const [tab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    })
-
-    const pageContent = tab?.id
-      ? await browser.tabs.sendMessage(tab.id, {
-          type: 'get_page_content',
-          data: {},
-        })
-      : null
-
-    return pageContent
-  }
-
   // Called when the user clicks Send or presses Enter
-  async handleSend() {
+  async handleSend(includePageContent = false) {
     const text = this.inputValue.trim()
     if (!text || this.loading) return
 
@@ -119,6 +115,7 @@ class MozChat extends LitElement {
 
     let messagesToSend: ChatMessageT[]
 
+    // this ended up not working well for some reason -- it seems to break cause the model to repeat itself
     if (!this.hasSystemMessage) {
       this.hasSystemMessage = true
       messagesToSend = [systemMessage, ...this.messages]
@@ -126,15 +123,17 @@ class MozChat extends LitElement {
       messagesToSend = this.messages
     }
 
-    if (this.includePageContent) {
+    if (includePageContent == true) {
+      console.log("include", includePageContent)
       const pageContent = await this.fetchPageContent()
+
       if (pageContent) {
         const lastUserIndex = messagesToSend.length - 1
 
         // Insert page content before the last user message
         messagesToSend.splice(lastUserIndex, 0, {
-          role: 'user',
-          content: `Here is the page content:\n\n${pageContent.textContent}`,
+          role: 'system',
+          content: `Here is the page content:\n\n${pageContent.textContent.slice(0,1000)}`,
         })
       }
     }
@@ -211,6 +210,13 @@ class MozChat extends LitElement {
             >
               ${this.loading ? '…' : 'Send'}
             </button>
+            <button
+            class="primary-button"
+            @click=${() => this.handleSend(true)}
+            ?disabled=${!this.inputValue.trim() || this.loading}
+          >
+            ${this.loading ? '…' : 'Send with page'}
+          </button>
           </div>
         </div>
       </div>
