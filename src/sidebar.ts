@@ -1,4 +1,5 @@
 import MozAttributeComparison from './features/MozAttributeComparison'
+import MozConversationalOnboarding from './features/onboarding/MozConversationalOnboarding'
 import MozQuestionAnswer from './features/MozQuestionAnswer'
 import MozPageSummarization from './features/page-summarization/MozPageSummarization'
 import MozTabs from './features/MozTabs'
@@ -9,6 +10,7 @@ import MozPlanChecklist from './features/MozPlanChecklist'
 import MozTabsDebug from './features/MozTabsDebug'
 
 customElements.define('moz-attribute-comparison', MozAttributeComparison)
+customElements.define('moz-conversational-onboarding', MozConversationalOnboarding)
 customElements.define('moz-question-answer', MozQuestionAnswer)
 customElements.define('moz-extension-hub', ExtensionHub)
 customElements.define('moz-page-summarization', MozPageSummarization)
