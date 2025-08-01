@@ -10,6 +10,7 @@ import { getPlannerResponse} from './services/planner'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
 import { getPlanResponse } from './services/plan-checklist'
+import { pageLauncher } from './services/pageLauncher'
 import { initEnvironment } from './systemConfig'
 
 browser.runtime.onInstalled.addListener(() => {
@@ -38,7 +39,7 @@ browser.runtime.onMessage.addListener(
 
     if (message.type === 'page_summarize') {
       const result = await getPageAssistResponse(
-        message.data as MessagePageAssistT
+        message.data as MessagePageAssistT,
       )
 
       browser.runtime.sendMessage({
@@ -96,5 +97,9 @@ browser.runtime.onMessage.addListener(
         result: result,
       })
     }
-  }
+
+    if (message.type === 'pages_open') {
+      pageLauncher(message.data.page)
+    }
+  },
 )
