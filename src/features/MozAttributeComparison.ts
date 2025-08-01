@@ -33,7 +33,6 @@ const getImportantCriteriaFromOpenAI = async (
   temperature = 0.2,
   max_tokens = 256
 ): Promise<string[]> => {
-  console.log("inside getImportantCriteriaFromOpenAI");
   const prompt = criteriaPromptTemplate({ userRequest })
 
   const response = await getOpenAIResponse({
@@ -48,7 +47,7 @@ const getImportantCriteriaFromOpenAI = async (
     ],
   })
 
-  console.log(`response = ${JSON.stringify(response)}`)
+  console.debug(`response = ${JSON.stringify(response)}`)
 
   const raw = response?.choices?.[0]?.message?.content || ''
 
@@ -263,21 +262,13 @@ class MozAttributeComparison extends LitElement {
     this.attrs = textarea.value
   }
 
-  handleIntentChange = async (event: Event) => {
-    const textarea = event.target as HTMLTextAreaElement
-    this.intent = textarea.value
-    console.log(`this.intent = ${this.intent}`)
-    // new openAI call to get the criteria to fill this.attrs
-
+  private async updateIntentCriteria() {
     try {
       const criteria = await getImportantCriteriaFromOpenAI(this.intent)
-      console.log(`criteria = ${JSON.stringify(criteria)}`);
+      console.debug(`criteria = ${JSON.stringify(criteria)}`);
       this.attrs = criteria.join('\n')
-      if (this.attrs.length === 0) {
-        this.attrs = DEFAULT_ATTRIBUTES
-      }
     } catch (err) {
-      console.error('Failed to fetch criteria from OpenAI:', err)
+      console.error('Failed to fetch criteria:', err)
       this.error = 'Could not generate attribute criteria from AI'
     }
   }
@@ -354,12 +345,20 @@ class MozAttributeComparison extends LitElement {
           <div class="controls-section">
             <div class="field">
 
-              <label class="label">User intent (buy strollers):</label>
+              <label class="label">User intent:</label>
               <textarea
                 class="text-area"
-                @input="${this.handleIntentChange}"
+                placeholder="e.g. buy baby strollers"
                 .value="${this.intent}"
+                @input="${(e: Event) => this.intent = (e.target as HTMLTextAreaElement).value}"
               ></textarea>
+              <button
+                class="primary-button"
+                @click="${this.updateIntentCriteria}"
+                ?disabled="${!this.intent.trim()}"
+              >
+                Generate Attributes
+              </button>
 
               <label class="label">Attributes (one per line):</label>
               <textarea
