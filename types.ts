@@ -100,6 +100,7 @@ export type PromptT = {
 // It's not clear what other values are on this type add as needed
 export type RunEngineMetadataT = {
   args?: any
+  options?: any
   prompt?: PromptT[]
   nPredict?: number
   skipPrompt?: boolean

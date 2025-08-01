@@ -241,6 +241,7 @@ class MozAttributeComparison extends LitElement {
           pageContent.textContent.replace(/\s+/g, ' ').slice(0, 2000),
           labels,
         ],
+        options: { multi_label: true },
       })
 
       if (!classificationResult) {
