@@ -1,12 +1,14 @@
 import { LitElement, html } from 'lit'
 import { LocalStorageKeys } from '../../const'
 import './MozEngineDownloadProgress'
+import './MozEngineWarning'
 
 type FeatureOption = {
   value:
     | 'chat'
     | 'page_qa'
     | 'page_summarization'
+    | 'plan_checklist'
     | 'tab_summarization'
     | 'planner'
     | 'tabs_debug'
@@ -40,6 +42,11 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     value: 'planner',
     label: 'Planner',
     component: () => html`<moz-planner></moz-planner>`,
+  },
+  {
+    value: 'plan_checklist',
+    label: 'Planner Checklist',
+    component: () => html`<moz-plan-checklist></moz-plan-checklist>`,
   },
   {
     value: 'tabs_debug',
@@ -91,6 +98,7 @@ class MozExtensionHub extends LitElement {
     return html`
       <div class="wrapper">
         <moz-engine-download-progress></moz-engine-download-progress>
+        <moz-engine-warning></moz-engine-warning>
         <div class="header">
           <select class="select" @change="${this.handleSelectChange}">
             ${FEATURE_OPTIONS.map(

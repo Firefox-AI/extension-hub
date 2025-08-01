@@ -4,6 +4,7 @@ import MozTabs from './features/MozTabs'
 import ExtensionHub from './components/ExtensionHub'
 import MozChat from './features/chat/MozChat'
 import MozPlanner from './features/planner/MozPlanner'
+import MozPlanChecklist from './features/MozPlanChecklist'
 import MozTabsDebug from './features/MozTabsDebug'
 
 customElements.define('moz-question-answer', MozQuestionAnswer)
@@ -12,4 +13,5 @@ customElements.define('moz-page-summarization', MozPageSummarization)
 customElements.define('moz-tabs', MozTabs)
 customElements.define('moz-chat', MozChat)
 customElements.define('moz-planner', MozPlanner)
+customElements.define('moz-plan-checklist', MozPlanChecklist)
 customElements.define('moz-tabs-debug', MozTabsDebug)

@@ -2,18 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { MessageTypesT } from '../types'
-import { getOpenAIResponse } from './services/openai'
-import { getMlEngineAIResponse } from './services/mlEngine'
-import { getLocalModelResponse } from './services/localModel'
-import { getTogeatherAIResponse } from './services/togetherai'
-import {
-  getHuggingFaceResponse,
-  getHuggingFaceChatResponse,
-} from './services/huggingface'
-import { getPlannerResponse } from './services/planner'
+import { MessageTypesT, MessagePageAssistT } from '../types'
+import { getPageQandAResponse } from './services/pageQandA'
+import { getPageAssistResponse } from './services/pageAssist'
+import { getHuggingFaceChatResponse } from './services/huggingface'
+import { getPlannerResponse} from './services/planner'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
+import { getPlanResponse } from './services/plan-checklist'
 import { initEnvironment } from './systemConfig'
 
 browser.runtime.onInstalled.addListener(() => {
@@ -45,18 +41,19 @@ browser.runtime.onMessage.addListener(
 
     if (message.type === 'page_qa') {
       const prompt = buildPrompt(message.data.prompt, message.data.textContent)
-      const result = await getOpenAIResponse(prompt)
+      const result = await getPageQandAResponse(prompt)
+
       browser.runtime.sendMessage({
-        type: 'ai_result',
+        type: 'page_qa_result',
         result: result,
       })
     }
 
     if (message.type === 'page_summarize') {
-      const prompt = buildPrompt(message.data.prompt, message.data.textContent)
-      const result = await getMlEngineAIResponse(prompt)
-      // const result = await getLocalModelResponse(prompt)
-      // const result = await getHuggingFaceResponse(prompt)
+      const result = await getPageAssistResponse(
+        message.data as MessagePageAssistT
+      )
+
       browser.runtime.sendMessage({
         type: 'page_summarize_result',
         result: result,
@@ -103,6 +100,14 @@ browser.runtime.onMessage.addListener(
         result,
       })
       return true
+    }
+
+    if (message.type === 'plan_check_request') {
+      const result = await getPlanResponse(message.data)
+      browser.runtime.sendMessage({
+        type: 'plan_check_result',
+        result: result,
+      })
     }
   }
 )

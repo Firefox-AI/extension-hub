@@ -64,7 +64,7 @@ browser.runtime.onMessage.addListener(
     if (message.type === 'page_qa') {
       const result = await getOpenAIResponse(prompt)
       browser.runtime.sendMessage({
-        type: 'ai_result',
+        type: 'page_qa_result',
         result: result,
       })
     }
@@ -105,7 +105,7 @@ Within each, you can see the function that is being called, along with the data 
     if (message.type === 'page_qa') {
       const result = await getOpenAIResponse(prompt)
       browser.runtime.sendMessage({
-        type: 'ai_result',
+        type: 'page_qa_result',
         result: result,
       })
     }
@@ -191,7 +191,7 @@ We then need to change the listener code (which defaults to `getOpenAIResponse` 
       console.log("QA MESSAGE")
       const result = await getLocalPirateAIResponse(message.data.textContent, message.data.prompt)
       browser.runtime.sendMessage({
-        type: 'ai_result',
+        type: 'page_qa_result',
         result: result,
       })
     }

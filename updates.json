@@ -1,0 +1,13 @@
+{
+  "addons": {
+    "extensionHub@mozilla.org": {
+      "updates": [
+        {
+          "version": "1.1",
+          "update_link": "https://raw.githubusercontent.com/Firefox-AI/extension-hub/refs/heads/main/extension-hub.xpi",
+          "update_hash": "sha256:77bb5762e0ea8d0df3d20fcb95915288239013ca80a86f42c8e9c7a09cf0dcce"
+        }
+      ]
+    }
+  }
+}

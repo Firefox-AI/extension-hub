@@ -148,10 +148,14 @@ class ExtensionHubSettings extends LitElement {
 
   handleUpdateEngineMetadata(e: Event, key: keyof EngineMetadataT) {
     const input = e.target as HTMLInputElement
-    this.engineMetadata[key] = input.value
+    const updatedEngineMetadata = {
+      ...this.engineMetadata,
+      [key]: input.value,
+    }
+    this.engineMetadata = updatedEngineMetadata
     // Update the engine metadata in
     browser.storage.local.set({
-      engine_metadata: this.engineMetadata,
+      engine_metadata: updatedEngineMetadata,
     })
   }
 
@@ -435,7 +439,7 @@ class ExtensionHubSettings extends LitElement {
                 type="text"
                 placeholder="Model Hub"
                 class="text-input"
-                value="${this.engineMetadata.modelHub}"
+                value="${this.engineMetadata.modelHub || ''}"
               />
             </div>
           </div>

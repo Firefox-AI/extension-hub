@@ -6,9 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack",
-    "start": "web-ext run --firefox=nightly --pref=extensions.experiments.enabled=true",
+    "release": "node release.js",
+    "start": "web-ext run --firefox=nightly --pref=extensions.experiments.enabled=true --pref=browser.startup.page=3 --profile-create-if-missing --keep-profile-changes --firefox-profile=./profile",
+    "start:fresh": "web-ext run --firefox=nightly --pref=extensions.experiments.enabled=true",
     "watch": "webpack --watch",
-    "xpi": "webpack && web-ext build --overwrite-dest"
+    "xpi": "webpack && web-ext build --artifacts-dir . --filename extension-hub.xpi --overwrite-dest"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +29,7 @@
     "css-loader": "^7.1.2",
     "lit": "^3.3.0",
     "marked": "^16.0.0",
+    "openai": "^5.10.2",
     "style-loader": "^4.0.0",
     "together-ai": "^0.17.0",
     "zod": "^3.25.75",

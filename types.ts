@@ -28,9 +28,11 @@ export type mlBrowserT = {
 
 export type MessageTypesT =
   | 'page_qa'
-  | 'ai_result'
+  | 'page_qa_result'
   | 'page_summarize'
   | 'page_summarize_result'
+  | 'plan_check_request'
+  | 'plan_check_result'
   | 'tab_summarize'
   | 'tab_summarize_result'
   | 'chat_message'
@@ -44,10 +46,17 @@ export type PromptDataT = {
   fullText: string
 }
 
+// Add to this type as needed
 export type EngineMetadataT = {
   taskName: string
-  modelHub: string
+  modelHub?: string
   modelId: string
+  modelFile?: string
+  modelHubRootUrl?: string
+  modelHubUrlTemplate?: string
+  modelRevision?: string
+  numContext?: number
+  backend?: string
 }
 
 export type CurrentSummaryT = {
@@ -80,4 +89,22 @@ export type TabsCollectionT = {
   smarter: TabsT
   start: TabsT
   tail: TabsT
+}
+
+// It's not clear what other values are on this type add as needed
+export type PromptT = {
+  role: string
+  content: string
+}
+
+// It's not clear what other values are on this type add as needed
+export type RunEngineMetadataT = {
+  prompt: PromptT[]
+  nPredict?: number
+  skipPrompt?: boolean
+}
+
+export type MessagePageAssistT = {
+  prompt: string
+  textContent: string
 }
