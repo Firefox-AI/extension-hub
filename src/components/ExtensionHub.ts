@@ -5,17 +5,26 @@ import './MozEngineWarning'
 
 type FeatureOption = {
   value:
+    | 'attribute_comparison'
     | 'chat'
+    | 'conversational_onboarding'
+    | 'extensionhub_dashboard'
     | 'page_qa'
     | 'page_summarization'
     | 'plan_checklist'
     | 'tab_summarization'
+    | 'planner'
     | 'tabs_debug'
   label: string
   component: () => unknown
 }
 
 const FEATURE_OPTIONS: FeatureOption[] = [
+  {
+    value: 'conversational_onboarding',
+    label: 'Conversational Onboarding',
+    component: () => html`<moz-conversational-onboarding></moz-conversational-onboarding>`,
+  },
   {
     value: 'page_qa',
     label: 'Page Q&A',
@@ -38,14 +47,29 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     component: () => html`<moz-chat></moz-chat>`,
   },
   {
+    value: 'planner',
+    label: 'Planner History',
+    component: () => html`<moz-planner></moz-planner>`,
+  },
+  {
     value: 'plan_checklist',
     label: 'Planner Checklist',
     component: () => html`<moz-plan-checklist></moz-plan-checklist>`,
   },
   {
+    value: 'attribute_comparison',
+    label: 'Attribute Comparison',
+    component: () => html`<moz-attribute-comparison></moz-attribute-comparison>`,
+  },
+  {
     value: 'tabs_debug',
     label: 'Tabs Debug',
     component: () => html`<moz-tabs-debug></moz-tabs-debug>`,
+  },
+  {
+    value: 'extensionhub_dashboard',
+    label: 'Extension Hub Dashboard',
+    component: () => html`<moz-extension-hub-dash></moz-extension-hub-dash>`,
   },
 ]
 
@@ -102,7 +126,7 @@ class MozExtensionHub extends LitElement {
                   ?selected=${this.feature === opt.value}
                 >
                   ${opt.label}
-                </option>`
+                </option>`,
             )}
           </select>
           <button class="settings-button" @click="${this.handleSettingsClick}">

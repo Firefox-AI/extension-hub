@@ -6,9 +6,11 @@ import { MessageTypesT, MessagePageAssistT } from '../types'
 import { getPageQandAResponse } from './services/pageQandA'
 import { getPageAssistResponse } from './services/pageAssist'
 import { getHuggingFaceChatResponse } from './services/huggingface'
+import { getPlannerResponse} from './services/planner'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
 import { getPlanResponse } from './services/plan-checklist'
+import { pageLauncher } from './services/pageLauncher'
 import { initEnvironment } from './systemConfig'
 
 browser.runtime.onInstalled.addListener(() => {
@@ -20,26 +22,14 @@ browser.runtime.onInstalled.addListener(() => {
 })
 
 /**
- * Get AI response for the given prompt and full text.
- * @param data
- * @returns
- */
-
-const buildPrompt = (prompt: string, textContent: string) => {
-  return `answer this question:${prompt}, with this data :${textContent}`
-}
-
-/**
  * Event Listeners
  */
 browser.runtime.onMessage.addListener(
   async (message: { type: MessageTypesT; data: any }) => {
-    // TODO - probably need to diversify prompts based on type of request, may need to
-    // set the patter to send textContent and prompt separately into each unique service
-    const prompt = buildPrompt(message.data.prompt, message.data.textContent)
+    console.log('[BG] Received message:', message)
 
     if (message.type === 'page_qa') {
-      const result = await getPageQandAResponse(prompt)
+      const result = await getPageQandAResponse(message.data.prompt, message.data.textContent)
 
       browser.runtime.sendMessage({
         type: 'page_qa_result',
@@ -49,7 +39,7 @@ browser.runtime.onMessage.addListener(
 
     if (message.type === 'page_summarize') {
       const result = await getPageAssistResponse(
-        message.data as MessagePageAssistT
+        message.data as MessagePageAssistT,
       )
 
       browser.runtime.sendMessage({
@@ -62,7 +52,8 @@ browser.runtime.onMessage.addListener(
     }
 
     if (message.type === 'tab_summarize') {
-      const result = await summarizeTabs(prompt)
+      const result = await summarizeTabs(message.data.prompt, message.data.textContent)
+
       browser.runtime.sendMessage({
         type: 'tab_summarize_result',
         result: result,
@@ -76,6 +67,28 @@ browser.runtime.onMessage.addListener(
         result: result,
       })
     }
+    
+    /* Planner
+     */
+    if (message.type === 'planner') {
+      // Initial planner request
+      const result = await getPlannerResponse(message.data.goal, message.data.type, false)
+      browser.runtime.sendMessage({
+        type: 'planner_result',
+        result,
+      })
+      return true
+    }
+
+    if (message.type === 'planner_followup') {
+      // Follow-up input, continue conversation
+      const result = await getPlannerResponse(message.data.followup, message.data.type, true)
+      browser.runtime.sendMessage({
+        type: 'planner_result',
+        result,
+      })
+      return true
+    }
 
     if (message.type === 'plan_check_request') {
       const result = await getPlanResponse(message.data)
@@ -84,5 +97,9 @@ browser.runtime.onMessage.addListener(
         result: result,
       })
     }
-  }
+
+    if (message.type === 'pages_open') {
+      pageLauncher(message.data.page)
+    }
+  },
 )

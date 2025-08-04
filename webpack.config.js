@@ -12,9 +12,9 @@ module.exports = {
         type: 'this',
       },
     },
-    content: './src/content.ts',
-    sidebar: './src/sidebar.ts',
     background: './src/background.ts',
+    content: './src/content.ts',
+    elements: './src/elements.ts',
     settings: './src/settings.ts',
   },
   output: {
@@ -41,6 +41,7 @@ module.exports = {
   devtool: 'cheap-module-source-map',
   plugins: [
     new Dotenv({
+      safe: false
     }),
   ],
 }

@@ -4,4 +4,3 @@ web-ext-artifacts
 .env
 .DS_Store
 *.txt
-profile
