@@ -200,10 +200,10 @@ class MozQuestionAnswer extends LitElement {
   }
 
   async handlePromptSubmit(prompt: string) {
-    const safteyCheck = await pageRestrictionService.checkPageRestricted()
+    const safetyCheck = await pageRestrictionService.checkPageRestricted()
 
-    if (safteyCheck.isRestricted) {
-      alert(`This page is restricted: ${safteyCheck.reason}`)
+    if (safetyCheck.isRestricted) {
+      alert(`This page is restricted: ${safetyCheck.reason}`)
       return
     }
 
