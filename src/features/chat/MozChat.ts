@@ -12,7 +12,7 @@ class MozChat extends LitElement {
   messages: ChatMessageT[] = []
   inputValue = ''
   loading = false
-  hasSystemMessage = true  // disabling this for the time being -- see not below
+  hasSystemMessage = true // disabling this for the time being -- see not below
 
   static get properties() {
     return {
@@ -37,11 +37,14 @@ class MozChat extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'chat_message_result') {
-      console.log("[handleIncomingMessage]", message)
+      console.log('[handleIncomingMessage]', message)
       const response = message.result
       this.loading = false
 
-      this.messages = [ ...this.messages, { role: 'assistant', content: response }]
+      this.messages = [
+        ...this.messages,
+        { role: 'assistant', content: response },
+      ]
       this.updated()
       // Scroll to bottom after new message
       this.updateComplete.then(() => {
@@ -51,23 +54,23 @@ class MozChat extends LitElement {
   }
 
   async fetchPageContent(): Promise<{
-      textContent: string
-      siteName: string
-    } | null> {
-      const [tab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      })
+    textContent: string
+    siteName: string
+  } | null> {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    })
 
-      const pageContent = tab?.id
-        ? await browser.tabs.sendMessage(tab.id, {
-            type: 'get_page_content',
-            data: {},
-          })
-        : null
+    const pageContent = tab?.id
+      ? await browser.tabs.sendMessage(tab.id, {
+          type: 'get_page_content',
+          data: {},
+        })
+      : null
 
-      return pageContent
-    }
+    return pageContent
+  }
 
   // Load stored chat history from browser.storage.local
   async loadHistory() {
@@ -124,7 +127,7 @@ class MozChat extends LitElement {
       messagesToSend = this.messages
     }
 
-    if (this.includePageContent) {
+    if (includePageContent) {
       const safteyCheck = await pageRestrictionService.checkPageRestricted()
 
       if (safteyCheck.isRestricted) {
@@ -140,7 +143,10 @@ class MozChat extends LitElement {
         // Insert page content before the last user message
         messagesToSend.splice(lastUserIndex, 0, {
           role: 'system',
-          content: `Here is the page content:\n\n${pageContent.textContent.slice(0,1000)}`,
+          content: `Here is the page content:\n\n${pageContent.textContent.slice(
+            0,
+            1000,
+          )}`,
         })
       }
     }
@@ -218,12 +224,12 @@ class MozChat extends LitElement {
               ${this.loading ? '…' : 'Send'}
             </button>
             <button
-            class="primary-button"
-            @click=${() => this.handleSend(true)}
-            ?disabled=${!this.inputValue.trim() || this.loading}
-          >
-            ${this.loading ? '…' : 'Send with page'}
-          </button>
+              class="primary-button"
+              @click=${() => this.handleSend(true)}
+              ?disabled=${!this.inputValue.trim() || this.loading}
+            >
+              ${this.loading ? '…' : 'Send with page'}
+            </button>
           </div>
         </div>
       </div>
