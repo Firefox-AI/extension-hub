@@ -42,7 +42,6 @@ export type MessageTypesT =
   | 'planner_result'
   | 'planner_followup'
 
-
 export type PromptDataT = {
   prompt: string
   fullText: string
@@ -109,6 +108,11 @@ export type RunEngineMetadataT = {
 }
 
 export type MessagePageAssistT = {
+  prompt: string
+  textContent: string
+}
+
+export type MessageSummarizeTabsT = {
   prompt: string
   textContent: string
 }

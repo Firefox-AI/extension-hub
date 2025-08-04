@@ -6,12 +6,89 @@ import { MessageTypesT, MessagePageAssistT } from '../types'
 import { getPageQandAResponse } from './services/pageQandA'
 import { getPageAssistResponse } from './services/pageAssist'
 import { getHuggingFaceChatResponse } from './services/huggingface'
-import { getPlannerResponse} from './services/planner'
+import { getPlannerResponse } from './services/planner'
 import initContextMenus from './contextMenu'
 import { summarizeTabs } from './services/browserHistory'
 import { getPlanResponse } from './services/plan-checklist'
 import { pageLauncher } from './services/pageLauncher'
 import { initEnvironment } from './systemConfig'
+
+// Message handler type definition
+type MessageHandler = (data: any) => Promise<void> | void
+
+// Message handlers object
+const messageHandlers: Partial<Record<MessageTypesT, MessageHandler>> = {
+  page_qa: async (data) => {
+    const result = await getPageQandAResponse(data.prompt, data.textContent)
+    browser.runtime.sendMessage({
+      type: 'page_qa_result',
+      result: result,
+    })
+  },
+
+  page_summarize: async (data) => {
+    const result = await getPageAssistResponse({
+      prompt: data.prompt,
+      textContent: data.textContent,
+    })
+    browser.runtime.sendMessage({
+      type: 'page_summarize_result',
+      result: result,
+      prompt: data.prompt,
+      url: data.url,
+      siteName: data.siteName,
+    })
+  },
+
+  tab_summarize: async (data) => {
+    const result = await summarizeTabs({
+      prompt: data.prompt,
+      textContent: data.textContent,
+    })
+    browser.runtime.sendMessage({
+      type: 'tab_summarize_result',
+      result: result,
+    })
+  },
+
+  chat_message: async (data) => {
+    const result = await getHuggingFaceChatResponse(data)
+    browser.runtime.sendMessage({
+      type: 'chat_message_result',
+      result: result,
+    })
+  },
+
+  planner: async (data) => {
+    // Initial planner request
+    const result = await getPlannerResponse(data.goal, data.type, false)
+    browser.runtime.sendMessage({
+      type: 'planner_result',
+      result,
+    })
+  },
+
+  planner_followup: async (data) => {
+    // Follow-up input, continue conversation
+    const result = await getPlannerResponse(data.followup, data.type, true)
+    browser.runtime.sendMessage({
+      type: 'planner_result',
+      result,
+    })
+  },
+
+  plan_check_request: async (data) => {
+    const result = await getPlanResponse(data)
+    browser.runtime.sendMessage({
+      type: 'plan_check_result',
+      result: result,
+    })
+  },
+
+  pages_open: (data) => {
+    pageLauncher(data.page)
+  },
+}
 
 browser.runtime.onInstalled.addListener(() => {
   browser.menus.removeAll().then(() => {
@@ -28,78 +105,16 @@ browser.runtime.onMessage.addListener(
   async (message: { type: MessageTypesT; data: any }) => {
     console.log('[BG] Received message:', message)
 
-    if (message.type === 'page_qa') {
-      const result = await getPageQandAResponse(message.data.prompt, message.data.textContent)
+    const handler = messageHandlers[message.type]
+    if (handler) {
+      await handler(message.data)
 
-      browser.runtime.sendMessage({
-        type: 'page_qa_result',
-        result: result,
-      })
-    }
-
-    if (message.type === 'page_summarize') {
-      const result = await getPageAssistResponse(
-        message.data as MessagePageAssistT,
-      )
-
-      browser.runtime.sendMessage({
-        type: 'page_summarize_result',
-        result: result,
-        prompt: message.data.prompt,
-        url: message.data.url,
-        siteName: message.data.siteName,
-      })
-    }
-
-    if (message.type === 'tab_summarize') {
-      const result = await summarizeTabs(message.data.prompt, message.data.textContent)
-
-      browser.runtime.sendMessage({
-        type: 'tab_summarize_result',
-        result: result,
-      })
-    }
-
-    if (message.type === 'chat_message') {
-      const result = await getHuggingFaceChatResponse(message.data)
-      browser.runtime.sendMessage({
-        type: 'chat_message_result',
-        result: result,
-      })
-    }
-    
-    /* Planner
-     */
-    if (message.type === 'planner') {
-      // Initial planner request
-      const result = await getPlannerResponse(message.data.goal, message.data.type, false)
-      browser.runtime.sendMessage({
-        type: 'planner_result',
-        result,
-      })
-      return true
-    }
-
-    if (message.type === 'planner_followup') {
-      // Follow-up input, continue conversation
-      const result = await getPlannerResponse(message.data.followup, message.data.type, true)
-      browser.runtime.sendMessage({
-        type: 'planner_result',
-        result,
-      })
-      return true
-    }
-
-    if (message.type === 'plan_check_request') {
-      const result = await getPlanResponse(message.data)
-      browser.runtime.sendMessage({
-        type: 'plan_check_result',
-        result: result,
-      })
-    }
-
-    if (message.type === 'pages_open') {
-      pageLauncher(message.data.page)
+      // Return true for async handlers that need to keep the message port open
+      if (message.type === 'planner' || message.type === 'planner_followup') {
+        return true
+      }
+    } else {
+      console.warn(`[BG] Unknown message type: ${message.type}`)
     }
   },
 )
