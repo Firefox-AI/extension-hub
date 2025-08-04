@@ -128,10 +128,10 @@ class MozChat extends LitElement {
     }
 
     if (includePageContent) {
-      const safteyCheck = await pageRestrictionService.checkPageRestricted()
+      const safetyCheck = await pageRestrictionService.checkPageRestricted()
 
-      if (safteyCheck.isRestricted) {
-        alert(`This page is restricted: ${safteyCheck.reason}`)
+      if (safetyCheck.isRestricted) {
+        alert(`This page is restricted: ${safetyCheck.reason}`)
         this.loading = false
         return
       }
