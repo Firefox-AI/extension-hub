@@ -7,7 +7,7 @@
  * How to use :
  * 
  * - Add new html page to the `pages` directory.
- * - In the page make make sure to include the <script src="../dist/elements.js" type="module"></script> script.
+ * - In the page make sure to include the <script src="../dist/elements.js" type="module"></script> script.
  * - Create a new "feature" lit component in src/features/optional-folder/featureName.ts
  * - Register the component in the `src/elements.ts` file, all functionality and styling should be done in the component.
  * - In the side bar for example you can call 
