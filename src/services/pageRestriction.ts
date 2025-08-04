@@ -5,7 +5,6 @@
 export interface PageCheckResult {
   isRestricted: boolean
   reason: string
-  isReaderMode?: boolean
 }
 
 export class PageRestrictionService {
@@ -55,42 +54,18 @@ export class PageRestrictionService {
     return PageRestrictionService.instance
   }
 
-  // This is just a placeholder I think we should
-  // come back and return the page content somehow instead of just seeing that
-  // it is reader mode and failing the request
-  private async checkReaderModeInTab(tabId: number): Promise<PageCheckResult> {
+  /**
+   * The main purpose of this function is to check if we can access the DOM of the current page.
+   * without throwing an error, if error occurs we can assume that the page is in reader mode or some other protected state.
+   * @param tabId
+   */
+  private async checkReaderModeInTab(tabId: number) {
     const result = await browser.scripting.executeScript({
       target: { tabId },
-      // type script is complaing about this return type but this is correct
       func: () => {
-        // Multiple checks reader mode and CSP issues
-        const checks = {
-          hasReaderTitle: !!document.getElementById('reader-title'),
-          hasReaderCSS: !!document.querySelector(
-            'link[href*="aboutReader.css"]',
-          ),
-          hasReaderCSP:
-            document
-              .querySelector('meta[http-equiv="Content-Security-Policy"]')
-              ?.getAttribute('content')
-              ?.includes('default-src chrome:') || false,
-        }
-
-        // Return true if any reader mode indicator is found
-        const isReaderMode = Object.values(checks).some((check) => check)
-
-        return {
-          isReaderMode,
-        }
+        document.querySelector('body')
       },
     })
-
-    return {
-      isRestricted: result[0].result.isReaderMode,
-      reason: result[0].result.isReaderMode
-        ? 'Page is in reader mode'
-        : 'Page is not in reader mode',
-    }
   }
 
   /**
@@ -134,19 +109,13 @@ export class PageRestrictionService {
         return urlCheck
       }
 
-      // Check for reader mode by trying to execute a simple script
-      // Reader mode will block this due to CSP
-      const readerModeCheck = await this.checkReaderModeInTab(tabs[0].id!)
-      if (readerModeCheck.isReaderMode) {
-        return readerModeCheck
-      }
-
+      await this.checkReaderModeInTab(tabs[0].id!)
       return this.defaultResponse
     } catch (error) {
       return {
         isRestricted: true,
         reason:
-          'Could not access tab information, your page is most likley in reader mode.',
+          'Could not access tab information, your page is most likley in reader mode or some other protected page.',
       }
     }
   }

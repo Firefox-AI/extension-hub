@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../../const'
+import { pageRestrictionService } from '../../services/pageRestriction'
 
 type ChatMessageT = {
   role: 'user' | 'assistant' | 'system'
@@ -57,7 +58,7 @@ class MozChat extends LitElement {
   async loadHistory() {
     try {
       const { chat_history } = await browser.storage.local.get(
-        LocalStorageKeys.CHAT_HISTORY
+        LocalStorageKeys.CHAT_HISTORY,
       )
       this.messages = chat_history ? chat_history : []
       this.updateComplete.then(() => {
@@ -127,6 +128,13 @@ class MozChat extends LitElement {
     }
 
     if (this.includePageContent) {
+      const safteyCheck = await pageRestrictionService.checkPageRestricted()
+
+      if (safteyCheck.isRestricted) {
+        alert(`This page is restricted: ${safteyCheck.reason}`)
+        this.loading = false
+        return
+      }
       const pageContent = await this.fetchPageContent()
       if (pageContent) {
         const lastUserIndex = messagesToSend.length - 1
@@ -180,7 +188,7 @@ class MozChat extends LitElement {
                     <div class="text">${msg.content}</div>
                   </div>
                 </div>
-              `
+              `,
             )}
             ${this.loading
               ? html`<div class="loading-indicator">
