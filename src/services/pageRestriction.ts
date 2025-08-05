@@ -115,7 +115,7 @@ export class PageRestrictionService {
       return {
         isRestricted: true,
         reason:
-          'Could not access tab information, your page is most likley in reader mode or some other protected page.',
+          'Could not access tab information, your page is most likely in reader mode or some other protected page.',
       }
     }
   }
