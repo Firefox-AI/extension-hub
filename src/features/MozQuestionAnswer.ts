@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../const'
 import { marked } from 'marked'
+import { pageRestrictionService } from '../services/pageRestriction'
 
 class MozQuestionAnswer extends LitElement {
   prompt: string = ''
@@ -164,7 +165,7 @@ class MozQuestionAnswer extends LitElement {
 
   async initData() {
     const storedData = await browser.storage.local.get(
-      LocalStorageKeys.LAST_QUESTION_ANSWER
+      LocalStorageKeys.LAST_QUESTION_ANSWER,
     )
     if (storedData.last_question_answer) {
       this.response = storedData.last_question_answer
@@ -198,7 +199,14 @@ class MozQuestionAnswer extends LitElement {
     this.prompt = input.value
   }
 
-  handlePromptSubmit(prompt: string) {
+  async handlePromptSubmit(prompt: string) {
+    const safetyCheck = await pageRestrictionService.checkPageRestricted()
+
+    if (safetyCheck.isRestricted) {
+      alert(`This page is restricted: ${safetyCheck.reason}`)
+      return
+    }
+
     browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
       if (tab?.id) {
         browser.tabs.sendMessage(tab.id, {
@@ -236,7 +244,7 @@ class MozQuestionAnswer extends LitElement {
                 >
                   ${question}
                 </button>
-              `
+              `,
             )}
           </div>
           ${this.loading
