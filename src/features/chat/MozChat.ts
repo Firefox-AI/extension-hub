@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../../const'
+import '../../components/shared'
 
 type ChatMessageT = {
   role: 'user' | 'assistant' | 'system'
@@ -11,7 +12,7 @@ class MozChat extends LitElement {
   messages: ChatMessageT[] = []
   inputValue = ''
   loading = false
-  hasSystemMessage = true  // disabling this for the time being -- see not below
+  hasSystemMessage = true // disabling this for the time being -- see not below
 
   static get properties() {
     return {
@@ -36,11 +37,14 @@ class MozChat extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'chat_message_result') {
-      console.log("[handleIncomingMessage]", message)
+      console.log('[handleIncomingMessage]', message)
       const response = message.result
       this.loading = false
 
-      this.messages = [ ...this.messages, { role: 'assistant', content: response }]
+      this.messages = [
+        ...this.messages,
+        { role: 'assistant', content: response },
+      ]
       this.updated()
       // Scroll to bottom after new message
       this.updateComplete.then(() => {
@@ -50,29 +54,29 @@ class MozChat extends LitElement {
   }
 
   async fetchPageContent(): Promise<{
-      textContent: string
-      siteName: string
-    } | null> {
-      const [tab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      })
+    textContent: string
+    siteName: string
+  } | null> {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    })
 
-      const pageContent = tab?.id
-        ? await browser.tabs.sendMessage(tab.id, {
-            type: 'get_page_content',
-            data: {},
-          })
-        : null
+    const pageContent = tab?.id
+      ? await browser.tabs.sendMessage(tab.id, {
+          type: 'get_page_content',
+          data: {},
+        })
+      : null
 
-      return pageContent
-    }
+    return pageContent
+  }
 
   // Load stored chat history from browser.storage.local
   async loadHistory() {
     try {
       const { chat_history } = await browser.storage.local.get(
-        LocalStorageKeys.CHAT_HISTORY
+        LocalStorageKeys.CHAT_HISTORY,
       )
       this.messages = chat_history ? chat_history : []
       this.updateComplete.then(() => {
@@ -124,7 +128,7 @@ class MozChat extends LitElement {
     }
 
     if (includePageContent == true) {
-      console.log("include", includePageContent)
+      console.log('include', includePageContent)
       const pageContent = await this.fetchPageContent()
 
       if (pageContent) {
@@ -133,7 +137,10 @@ class MozChat extends LitElement {
         // Insert page content before the last user message
         messagesToSend.splice(lastUserIndex, 0, {
           role: 'system',
-          content: `Here is the page content:\n\n${pageContent.textContent.slice(0,1000)}`,
+          content: `Here is the page content:\n\n${pageContent.textContent.slice(
+            0,
+            1000,
+          )}`,
         })
       }
     }
@@ -179,7 +186,7 @@ class MozChat extends LitElement {
                     <div class="text">${msg.content}</div>
                   </div>
                 </div>
-              `
+              `,
             )}
             ${this.loading
               ? html`<div class="loading-indicator">
@@ -190,33 +197,36 @@ class MozChat extends LitElement {
               : ''}
           </div>
 
-          <textarea
+          <eh-textarea
             .value=${this.inputValue}
-            @input=${(e: Event) =>
-              (this.inputValue = (e.target as HTMLTextAreaElement).value)}
-            @keydown=${this.onKeydown}
+            @textarea-input=${(e: CustomEvent) =>
+              (this.inputValue = e.detail.value)}
+            @textarea-keydown=${(e: CustomEvent) =>
+              this.onKeydown(e.detail.originalEvent)}
             placeholder="Type your message…"
             ?disabled=${this.loading}
-          ></textarea>
+            rows="3"
+            resize="none"
+          ></eh-textarea>
 
           <div class="footer">
-            <button class="outline-button" @click=${this.handleClearChat}>
+            <eh-button variant="outline" @button-click=${this.handleClearChat}>
               Clear Chat
-            </button>
-            <button
-              class="primary-button"
-              @click=${this.handleSend}
+            </eh-button>
+            <eh-button
+              variant="primary"
+              @button-click=${this.handleSend}
               ?disabled=${!this.inputValue.trim() || this.loading}
             >
               ${this.loading ? '…' : 'Send'}
-            </button>
-            <button
-            class="primary-button"
-            @click=${() => this.handleSend(true)}
-            ?disabled=${!this.inputValue.trim() || this.loading}
-          >
-            ${this.loading ? '…' : 'Send with page'}
-          </button>
+            </eh-button>
+            <eh-button
+              variant="primary"
+              @button-click=${() => this.handleSend(true)}
+              ?disabled=${!this.inputValue.trim() || this.loading}
+            >
+              ${this.loading ? '…' : 'Send with page'}
+            </eh-button>
           </div>
         </div>
       </div>
@@ -301,38 +311,8 @@ class MozChat extends LitElement {
         border-bottom-left-radius: 0;
       }
 
-      textarea {
-        resize: none;
-        padding: 8px;
-        border: 1px solid var(--color-border);
-        border-radius: 4px;
-        background-color: var(--color-input-bg);
-        color: var(--color-fg);
+      eh-textarea {
         margin: 12px 0;
-      }
-
-      .primary-button {
-        padding: 8px 12px;
-        background-color: var(--color-border);
-        color: var(--color-fg);
-        border: 1px solid var(--color-border);
-        border-radius: 4px;
-        cursor: pointer;
-
-        &:disabled {
-          background-color: var(--color-primary-disabled);
-          border-color: var(--color-primary-disabled);
-          cursor: not-allowed;
-        }
-      }
-
-      .outline-button {
-        padding: 8px 12px;
-        color: var(--color-fg);
-        border: 1px solid var(--color-fg);
-        border-radius: 4px;
-        cursor: pointer;
-        background-color: transparent;
       }
 
       .footer {

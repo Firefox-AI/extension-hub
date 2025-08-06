@@ -10,6 +10,9 @@ import MozQuestionAnswer from './features/MozQuestionAnswer'
 import MozTabs from './features/MozTabs'
 import MozTabsDebug from './features/MozTabsDebug'
 
+// Import all reusable components
+import './components/shared'
+
 customElements.define('moz-attribute-comparison', MozAttributeComparison)
 customElements.define('moz-chat', MozChat)
 customElements.define('moz-conversational-onboarding', MozConversationalOnboarding)

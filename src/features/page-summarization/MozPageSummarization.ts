@@ -4,6 +4,7 @@ import { marked } from 'marked'
 import { LocalStorageKeys } from '../../../const'
 import './MozPageSummaryHistory'
 import { CurrentSummaryT, SummaryHistoryItemT } from '../../../types'
+import '../../components/shared'
 
 const PROMPT_OPTIONS = [
   'Can you summarize this page?',
@@ -95,15 +96,6 @@ class MozPageSummarization extends LitElement {
       flex-direction: column;
     }
 
-    .text-input {
-      padding: 8px;
-      border: 1px solid var(--color-border);
-      border-radius: 4px;
-      margin-bottom: 10px;
-      background-color: var(--color-input-bg);
-      color: var(--color-fg);
-    }
-
     .label {
       display: block;
       margin-bottom: 8px;
@@ -111,37 +103,8 @@ class MozPageSummarization extends LitElement {
       margin-top: 10px;
     }
 
-    .pos-button {
-      background-color: var(--color-pos-bg);
-      color: var(--color-fg);
-      border: none;
-      border-radius: 4px;
-      padding: 8px 12px;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-
-    .primary-button {
-      padding: 8px 12px;
-      background-color: var(--color-border);
-      color: var(--color-fg);
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-
-      &:disabled {
-        background-color: var(--color-primary-disabled);
-        cursor: not-allowed;
-      }
-    }
-
-    .outline-button {
-      padding: 8px 12px;
-      color: var(--color-fg);
-      border: 1px solid var(--color-fg);
-      border-radius: 4px;
-      cursor: pointer;
-      background-color: transparent;
+    eh-textarea {
+      margin-bottom: 10px;
     }
 
     .history {
@@ -246,7 +209,7 @@ class MozPageSummarization extends LitElement {
       if (info.menuItemId !== ContextMenuIds.TEXT_SELECTION_SUMMARIZATION)
         return
       console.log(
-        `Context menu clicked:${info.selectionText} in tab ${tab?.url}`
+        `Context menu clicked:${info.selectionText} in tab ${tab?.url}`,
       )
     })
   }
@@ -294,11 +257,6 @@ class MozPageSummarization extends LitElement {
     })
   }
 
-  handleInput(event: Event) {
-    const input = event.target as HTMLInputElement
-    this.prompt = input.value
-  }
-
   async handleSaveSummary() {
     if (!this.currentSummary.result) {
       alert('No summary available to save.')
@@ -306,7 +264,7 @@ class MozPageSummarization extends LitElement {
     }
 
     const { mock_summary_database } = await browser.storage.local.get(
-      LocalStorageKeys.MOCK_SUMMARY_DATABASE
+      LocalStorageKeys.MOCK_SUMMARY_DATABASE,
     )
 
     const newSummary: SummaryHistoryItemT = {
@@ -331,7 +289,7 @@ class MozPageSummarization extends LitElement {
     this.showHistory = !this.showHistory
     if (this.showHistory) {
       const { mock_summary_database } = await browser.storage.local.get(
-        LocalStorageKeys.MOCK_SUMMARY_DATABASE
+        LocalStorageKeys.MOCK_SUMMARY_DATABASE,
       )
       this.history = mock_summary_database || []
     }
@@ -354,9 +312,12 @@ class MozPageSummarization extends LitElement {
         <div class="container">
           <div class="heading-wrapper">
             <h3 class="title">Page Summarization</h3>
-            <button class="primary-button" @click="${this.handleToggleHistory}">
+            <eh-button
+              variant="primary"
+              @button-click="${this.handleToggleHistory}"
+            >
               ${this.showHistory ? '- History' : '+ History'}
-            </button>
+            </eh-button>
           </div>
 
           ${this.loading
@@ -380,12 +341,13 @@ class MozPageSummarization extends LitElement {
                 </div>
                 ${this.showSaveButton
                   ? html`
-                      <button
-                        class="pos-button"
-                        @click="${this.handleSaveSummary}"
+                      <eh-button
+                        ?wide=${true}
+                        variant="primary"
+                        @button-click="${this.handleSaveSummary}"
                       >
                         Save Summary
-                      </button>
+                      </eh-button>
                     `
                   : null}
               `
@@ -394,70 +356,73 @@ class MozPageSummarization extends LitElement {
             ? html`
                 <div class="fields">
                   <label class="label">Enter Prompt</label>
-                  <textarea
-                    class="text-input"
+                  <eh-textarea
                     .value=${this.prompt}
-                    .disabled=${this.loading}
+                    ?disabled=${this.loading}
                     rows="4"
-                    @input=${this.handleInput}
-                  ></textarea>
+                    @textarea-input=${(e: CustomEvent) =>
+                      (this.prompt = e.detail.value)}
+                  ></eh-textarea>
                 </div>
 
                 ${!this.showBank
                   ? html`
-                      <button
-                        class="outline-button mb-10"
-                        @click=${this.handleOpenPromptBank}
+                      <eh-button
+                        ?wide=${true}
+                        variant="outline"
+                        class="mb-10 flex"
+                        @button-click=${this.handleOpenPromptBank}
                       >
                         Select Prompt From Bank
-                      </button>
+                      </eh-button>
                     `
                   : html` <section>
                       <div class="bank-container">
                         ${PROMPT_OPTIONS.map(
                           (option) => html`
-                            <button
-                              class="outline-button"
-                              @click=${() => {
+                            <eh-button
+                              variant="outline"
+                              @button-click=${() => {
                                 this.prompt = option
                                 this.handleClosePromptBank()
                                 this.handlePromptSubmit()
                               }}
                             >
                               ${option}
-                            </button>
-                          `
+                            </eh-button>
+                          `,
                         )}
                       </div>
                       <div class="bank-actions-wrapper">
                         <div class="bank-actions-container">
-                          <button
-                            class="primary-button"
-                            @click=${() => {
+                          <eh-button
+                            variant="primary"
+                            @button-click=${() => {
                               alert(
-                                'Custom prompt functionality not implemented yet. - NG'
+                                'Custom prompt functionality not implemented yet. - NG',
                               )
                             }}
                           >
                             + Add Custom Prompt
-                          </button>
-                          <button
-                            class="outline-button"
-                            @click=${this.handleClosePromptBank}
+                          </eh-button>
+                          <eh-button
+                            variant="outline"
+                            @button-click=${this.handleClosePromptBank}
                           >
                             Cancel
-                          </button>
+                          </eh-button>
                         </div>
                       </div>
                     </section>`}
 
-                <button
-                  class="primary-button"
-                  @click=${this.handlePromptSubmit}
-                  .disabled=${this.loading}
+                <eh-button
+                  variant="primary"
+                  ?wide=${true}
+                  @button-click=${this.handlePromptSubmit}
+                  ?disabled=${this.loading}
                 >
                   ${this.loading ? 'Loading...' : 'Ask'}
-                </button>
+                </eh-button>
               `
             : null}
         </div>

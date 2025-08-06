@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../../const'
 import { SummaryHistoryItemT } from '../../../types'
+import '../../components/shared'
 
 export class MozPageSummaryHistory extends LitElement {
   historyDetails: SummaryHistoryItemT | null = null
@@ -57,24 +58,6 @@ export class MozPageSummaryHistory extends LitElement {
       display: block;
       margin-bottom: 0px;
       font-weight: bold;
-    }
-
-    .primary-button {
-      padding: 8px 12px;
-      background-color: var(--color-border);
-      color: var(--color-fg);
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .clear-button {
-      padding: 8px 12px;
-      background-color: var(--color-bg);
-      color: var(--color-fg);
-      border: 1px solid var(--color-fg);
-      border-radius: 4px;
-      cursor: pointer;
     }
 
     .history {
@@ -146,10 +129,6 @@ export class MozPageSummaryHistory extends LitElement {
       position: sticky;
       top: 0;
       z-index: 1;
-
-      button {
-        pointer-events: auto;
-      }
     }
 
     .italic {
@@ -207,14 +186,15 @@ export class MozPageSummaryHistory extends LitElement {
         ${this.historyDetails
           ? html`<div class="details-wrapper">
               <div class="details-heading-wrapper">
-                <button
-                  class="clear-button"
-                  @click=${() => {
+                <eh-button
+                  variant="outline"
+                  @button-click=${() => {
                     this.historyDetails = null
+                    console.log('Back to history')
                   }}
                 >
                   Back To History
-                </button>
+                </eh-button>
               </div>
               <h2>History Details</h2>
               <div class="history-details-container">
@@ -256,26 +236,26 @@ export class MozPageSummaryHistory extends LitElement {
                     </div>
 
                     <div class="history-item-actions">
-                      <button
-                        class="clear-button"
-                        @click=${() => {
+                      <eh-button
+                        variant="outline"
+                        @button-click=${() => {
                           this.historyDeleteHistoryItem(item.id)
                         }}
                       >
                         Delete
-                      </button>
-                      <button
-                        class="primary-button"
-                        @click=${() => {
+                      </eh-button>
+                      <eh-button
+                        variant="primary"
+                        @button-click=${() => {
                           this.historyDetails = item
                         }}
                       >
                         View Details
-                      </button>
+                      </eh-button>
                     </div>
                   </div>
                   <hr />
-                `
+                `,
               )}
             </div>`}
       </div>
