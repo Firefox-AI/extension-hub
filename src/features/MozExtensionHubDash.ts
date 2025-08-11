@@ -37,6 +37,12 @@ class MozExtensionHubDash extends LitElement {
           >
             Open onboarding page
           </button>
+          <button
+            class="settings-button"
+            @click="${() => this.handlePageClick('homepage.html')}"
+          >
+            Open homepage
+          </button>
         </div>
       </div>
     `

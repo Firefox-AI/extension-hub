@@ -23,7 +23,8 @@ const FEATURE_OPTIONS: FeatureOption[] = [
   {
     value: 'conversational_onboarding',
     label: 'Conversational Onboarding',
-    component: () => html`<moz-conversational-onboarding></moz-conversational-onboarding>`,
+    component: () =>
+      html`<moz-conversational-onboarding></moz-conversational-onboarding>`,
   },
   {
     value: 'page_qa',
@@ -59,7 +60,8 @@ const FEATURE_OPTIONS: FeatureOption[] = [
   {
     value: 'attribute_comparison',
     label: 'Attribute Comparison',
-    component: () => html`<moz-attribute-comparison></moz-attribute-comparison>`,
+    component: () =>
+      html`<moz-attribute-comparison></moz-attribute-comparison>`,
   },
   {
     value: 'tabs_debug',
@@ -86,6 +88,20 @@ class MozExtensionHub extends LitElement {
 
   createRenderRoot() {
     return this
+  }
+
+  connectedCallback() {
+    super.connectedCallback()
+    browser.runtime.onMessage.addListener(this.handleIncomingMessage)
+  }
+
+  handleIncomingMessage = async (message: any) => {
+    if (message.type === 'homepage_action_click') {
+      this.feature = 'page_qa'
+      await browser.storage.local.set({
+        [LocalStorageKeys.CURRENT_FEATURE]: this.feature,
+      })
+    }
   }
 
   async firstUpdated() {
@@ -118,7 +134,11 @@ class MozExtensionHub extends LitElement {
         <moz-engine-download-progress></moz-engine-download-progress>
         <moz-engine-warning></moz-engine-warning>
         <div class="header">
-          <select class="select" @change="${this.handleSelectChange}">
+          <select
+            class="select"
+            @change="${this.handleSelectChange}"
+            value="${this.feature}"
+          >
             ${FEATURE_OPTIONS.map(
               (opt) =>
                 html`<option
