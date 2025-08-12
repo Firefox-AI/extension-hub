@@ -10,7 +10,7 @@ import {
 } from '../../types'
 
 export const getPageAssistResponse = async (
-  pageAssistantData: MessagePageAssistT
+  pageAssistantData: MessagePageAssistT,
 ) => {
   const { prompt, textContent } = pageAssistantData
   // Note there is also the option to use local storage inputs from preferences page
@@ -31,12 +31,12 @@ export const getPageAssistResponse = async (
   const promptThread = [
     {
       role: 'system',
-      content:
-        '/no_think Your role is to summarize the provided content as succinctly as possible while retaining the most important information /no_think',
+      content: `/no_think Your role is to summarize the provided content as succinctly as possible while 
+        retaining the most important information , Respond with HTML only using these tags:<p>, <i>, <h1>, <h2>, <h3>, <h4>, <b>, <ul> ./no_think`,
     },
     {
       role: 'user',
-      content: `/no_think ${formattedPrompt.slice(0, 2000)} /no_think`, // Limit prompt length to avoid errors
+      content: `/no_think ${formattedPrompt.slice(0, 4000)} /no_think`, // Limit prompt length to avoid errors
     },
   ]
 
@@ -59,7 +59,7 @@ export const getPageAssistResponse = async (
     'Page Assistant response:',
     response,
     typeof response,
-    final_answer
+    final_answer,
   )
 
   return final_answer

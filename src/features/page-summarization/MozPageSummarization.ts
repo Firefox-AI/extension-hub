@@ -246,7 +246,7 @@ class MozPageSummarization extends LitElement {
       if (info.menuItemId !== ContextMenuIds.TEXT_SELECTION_SUMMARIZATION)
         return
       console.log(
-        `Context menu clicked:${info.selectionText} in tab ${tab?.url}`
+        `Context menu clicked:${info.selectionText} in tab ${tab?.url}`,
       )
     })
   }
@@ -257,22 +257,22 @@ class MozPageSummarization extends LitElement {
   }
 
   handleIncomingMessage = async (message: any) => {
-    if (message.type === 'page_summarize_result') {
-      const formattedResponse = await marked.parse(message.result)
-      this.loading = false
-      this.response = formattedResponse
-        ? formattedResponse
-        : 'No response received. Please try again.'
-      this.showSaveButton = true
-      browser.storage.local.set({
-        [LocalStorageKeys.LAST_PAGE_SUMMARIZATION]: this.response,
-      })
-      this.currentSummary = {
-        result: formattedResponse,
-        prompt: message.prompt,
-        url: message.url,
-        siteName: message.siteName,
-      }
+    if (message.type !== 'page_summarize_result') return
+
+    const formattedResponse = await marked.parse(message.result)
+    this.loading = false
+    this.response = formattedResponse
+      ? formattedResponse
+      : 'No response received. Please try again.'
+    this.showSaveButton = true
+    browser.storage.local.set({
+      [LocalStorageKeys.LAST_PAGE_SUMMARIZATION]: this.response,
+    })
+    this.currentSummary = {
+      result: message.result,
+      prompt: message.prompt,
+      url: message.url,
+      siteName: message.siteName,
     }
   }
 
@@ -306,7 +306,7 @@ class MozPageSummarization extends LitElement {
     }
 
     const { mock_summary_database } = await browser.storage.local.get(
-      LocalStorageKeys.MOCK_SUMMARY_DATABASE
+      LocalStorageKeys.MOCK_SUMMARY_DATABASE,
     )
 
     const newSummary: SummaryHistoryItemT = {
@@ -331,7 +331,7 @@ class MozPageSummarization extends LitElement {
     this.showHistory = !this.showHistory
     if (this.showHistory) {
       const { mock_summary_database } = await browser.storage.local.get(
-        LocalStorageKeys.MOCK_SUMMARY_DATABASE
+        LocalStorageKeys.MOCK_SUMMARY_DATABASE,
       )
       this.history = mock_summary_database || []
     }
@@ -426,7 +426,7 @@ class MozPageSummarization extends LitElement {
                             >
                               ${option}
                             </button>
-                          `
+                          `,
                         )}
                       </div>
                       <div class="bank-actions-wrapper">
@@ -435,7 +435,7 @@ class MozPageSummarization extends LitElement {
                             class="primary-button"
                             @click=${() => {
                               alert(
-                                'Custom prompt functionality not implemented yet. - NG'
+                                'Custom prompt functionality not implemented yet. - NG',
                               )
                             }}
                           >
