@@ -31,8 +31,8 @@ export const getPageAssistResponse = async (
   const promptThread = [
     {
       role: 'system',
-      content: `/no_think Your role is to summarize the provided content as succinctly as possible while 
-        retaining the most important information , Respond with HTML only using these tags:<p>, <i>, <h1>, <h2>, <h3>, <h4>, <b>, <ul> ./no_think`,
+      content:
+        '/no_think Your role is to summarize the provided content as succinctly as possible while retaining the most important information /no_think',
     },
     {
       role: 'user',

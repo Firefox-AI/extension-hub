@@ -259,7 +259,6 @@ class MozPageSummarization extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type !== 'page_summarize_result') return
-
     const formattedResponse = await marked.parse(message.result)
     this.loading = false
     this.response = formattedResponse
