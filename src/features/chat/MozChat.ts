@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../../const'
 import TinyMark from '../../services/tinyMark'
+import { pageRestrictionService } from '../../services/pageRestriction'
 
 type ChatMessageT = {
   role: 'user' | 'assistant' | 'system'
@@ -129,7 +130,14 @@ class MozChat extends LitElement {
       messagesToSend = this.messages
     }
 
-    if (includePageContent == true) {
+    if (includePageContent) {
+      const safetyCheck = await pageRestrictionService.checkPageRestricted()
+
+      if (safetyCheck.isRestricted) {
+        alert(`This page is restricted: ${safetyCheck.reason}`)
+        this.loading = false
+        return
+      }
       const pageContent = await this.fetchPageContent()
 
       if (pageContent) {
@@ -183,7 +191,7 @@ class MozChat extends LitElement {
                   <div class="bubble ${msg.role}">
                     <div
                       class="text"
-                      .innerHTML=${this.simpleMarkdown.parse(msg.content)}
+                      .innerHTML=${this.tinyMark.parse(msg.content)}
                     ></div>
                   </div>
                 </div>

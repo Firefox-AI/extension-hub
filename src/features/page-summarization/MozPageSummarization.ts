@@ -4,6 +4,7 @@ import { marked } from 'marked'
 import { LocalStorageKeys } from '../../../const'
 import './MozPageSummaryHistory'
 import { CurrentSummaryT, SummaryHistoryItemT } from '../../../types'
+import { pageRestrictionService } from '../../services/pageRestriction'
 
 const PROMPT_OPTIONS = [
   'Can you summarize this page?',
@@ -276,7 +277,14 @@ class MozPageSummarization extends LitElement {
     }
   }
 
-  handlePromptSubmit() {
+  async handlePromptSubmit() {
+    const safetyCheck = await pageRestrictionService.checkPageRestricted()
+
+    if (safetyCheck.isRestricted) {
+      alert(`This page is restricted: ${safetyCheck.reason}`)
+      return
+    }
+
     if (!this.prompt) {
       this.prompt = PROMPT_OPTIONS[0]
     }
