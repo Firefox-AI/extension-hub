@@ -36,7 +36,7 @@ export const getPageAssistResponse = async (
     },
     {
       role: 'user',
-      content: `/no_think ${formattedPrompt.slice(0, 4000)} /no_think`, // Limit prompt length to avoid errors
+      content: `/no_think ${formattedPrompt.slice(0, 2000)} /no_think`, // Limit prompt length to avoid errors
     },
   ]
 
