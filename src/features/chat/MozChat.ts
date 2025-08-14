@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../../const'
+import TinyMark from '../../services/tinyMark'
 
 type ChatMessageT = {
   role: 'user' | 'assistant' | 'system'
@@ -11,13 +12,15 @@ class MozChat extends LitElement {
   messages: ChatMessageT[] = []
   inputValue = ''
   loading = false
-  hasSystemMessage = true  // disabling this for the time being -- see not below
+  hasSystemMessage = true // disabling this for the time being -- see not below
+  tinyMark: TinyMark
 
   static get properties() {
     return {
       messages: { type: Array },
       inputValue: { type: String },
       loading: { type: Boolean },
+      tinyMark: { type: Object },
     }
   }
 
@@ -26,6 +29,7 @@ class MozChat extends LitElement {
     this.messages = []
     this.inputValue = ''
     this.loading = false
+    this.tinyMark = new TinyMark()
   }
 
   connectedCallback() {
@@ -36,11 +40,13 @@ class MozChat extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'chat_message_result') {
-      console.log("[handleIncomingMessage]", message)
       const response = message.result
       this.loading = false
 
-      this.messages = [ ...this.messages, { role: 'assistant', content: response }]
+      this.messages = [
+        ...this.messages,
+        { role: 'assistant', content: response },
+      ]
       this.updated()
       // Scroll to bottom after new message
       this.updateComplete.then(() => {
@@ -50,29 +56,29 @@ class MozChat extends LitElement {
   }
 
   async fetchPageContent(): Promise<{
-      textContent: string
-      siteName: string
-    } | null> {
-      const [tab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      })
+    textContent: string
+    siteName: string
+  } | null> {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    })
 
-      const pageContent = tab?.id
-        ? await browser.tabs.sendMessage(tab.id, {
-            type: 'get_page_content',
-            data: {},
-          })
-        : null
+    const pageContent = tab?.id
+      ? await browser.tabs.sendMessage(tab.id, {
+          type: 'get_page_content',
+          data: {},
+        })
+      : null
 
-      return pageContent
-    }
+    return pageContent
+  }
 
   // Load stored chat history from browser.storage.local
   async loadHistory() {
     try {
       const { chat_history } = await browser.storage.local.get(
-        LocalStorageKeys.CHAT_HISTORY
+        LocalStorageKeys.CHAT_HISTORY,
       )
       this.messages = chat_history ? chat_history : []
       this.updateComplete.then(() => {
@@ -124,7 +130,6 @@ class MozChat extends LitElement {
     }
 
     if (includePageContent == true) {
-      console.log("include", includePageContent)
       const pageContent = await this.fetchPageContent()
 
       if (pageContent) {
@@ -133,7 +138,7 @@ class MozChat extends LitElement {
         // Insert page content before the last user message
         messagesToSend.splice(lastUserIndex, 0, {
           role: 'system',
-          content: `Here is the page content:\n\n${pageContent.textContent.slice(0,1000)}`,
+          content: `Here is the page content:\n\n${pageContent.textContent.slice(0, 1000)}`,
         })
       }
     }
@@ -176,10 +181,13 @@ class MozChat extends LitElement {
               (msg) => html`
                 <div class="bubble-wrapper ${msg.role}">
                   <div class="bubble ${msg.role}">
-                    <div class="text">${msg.content}</div>
+                    <div
+                      class="text"
+                      .innerHTML=${this.simpleMarkdown.parse(msg.content)}
+                    ></div>
                   </div>
                 </div>
-              `
+              `,
             )}
             ${this.loading
               ? html`<div class="loading-indicator">
@@ -211,12 +219,12 @@ class MozChat extends LitElement {
               ${this.loading ? '…' : 'Send'}
             </button>
             <button
-            class="primary-button"
-            @click=${() => this.handleSend(true)}
-            ?disabled=${!this.inputValue.trim() || this.loading}
-          >
-            ${this.loading ? '…' : 'Send with page'}
-          </button>
+              class="primary-button"
+              @click=${() => this.handleSend(true)}
+              ?disabled=${!this.inputValue.trim() || this.loading}
+            >
+              ${this.loading ? '…' : 'Send with page'}
+            </button>
           </div>
         </div>
       </div>

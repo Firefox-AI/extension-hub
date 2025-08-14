@@ -1,10 +1,10 @@
 /**
- * SimpleMarkdown - a minimal, secure markdown parser
+ * TinyMark - a minimal, secure markdown parser
  * Features: headers (h1–h6), paragraphs, **bold**, *italic*, unordered/ordered lists
  * Notes: No nested lists, no inline HTML. Escapes HTML to prevent XSS.
  */
 
-export interface SimpleMarkdownOptions {
+export interface TinyMarkMarkdOptions {
   bold?: boolean // **text** or __text__
   italic?: boolean // *text* or _text_
   headers?: boolean // # ## ### #### ##### ######
@@ -13,7 +13,7 @@ export interface SimpleMarkdownOptions {
   paragraphs?: boolean // blank-line separated
 }
 
-type RequiredOptions = Required<SimpleMarkdownOptions>
+type RequiredOptions = Required<TinyMarkMarkdOptions>
 
 interface ParserState {
   inUnorderedList: boolean
@@ -27,17 +27,18 @@ interface InlineRule {
   replacer: (substring: string, ...args: any[]) => string
 }
 
-const UNESCAPED_SINGLE_ASTERISK_ITALIC_PATTERN = /(?<!\\)\*(.+?)\*/g
-const UNESCAPED_SINGLE_UNDERSCORE_ITALIC_BOUNDARY_PATTERN =
-  /(?<!\\)(?<!\w)_(.+?)_(?!\w)/g
 const NORMALIZE_LINE_ENDINGS_PATTERN = /\r\n?/g
 const ESCAPED_MARKDOWN_EMPHASIS_PATTERN = /\\([*_])/g
-const INLINE_BOLD_ASTERISKS = /(?<!\\)\*\*(.+?)\*\*/g
-const UNESCAPED_DOUBLE_UNDERSCORE_BOLD_PATTERN =
-  /(?<!\\)(?<!\w)__(.+?)__(?!\w)/g
 const HTML_ESCAPE_CHARS = /[&<>"'/]/g
+// The Following patters have backtracking removed for performance
+const UNESCAPED_SINGLE_ASTERISK_ITALIC_PATTERN = /(?<!\\)\*([^\n*]+?)\*/g
+const UNESCAPED_SINGLE_UNDERSCORE_ITALIC_BOUNDARY_PATTERN =
+  /(?<!\\)(?<![\p{L}\p{N}])_([^\n_]+?)_(?![\p{L}\p{N}])/gu
+const INLINE_BOLD_ASTERISKS = /(?<!\\)\*\*([^\n*]+?)\*\*/g
+const UNESCAPED_DOUBLE_UNDERSCORE_BOLD_PATTERN =
+  /(?<!\\)(?<![\p{L}\p{N}])__([^\n_]+?)__(?![\p{L}\p{N}])/gu
 
-export class SimpleMarkdown {
+class TinyMark {
   private readonly options: RequiredOptions
   private state: ParserState
   private readonly re = {
@@ -48,7 +49,7 @@ export class SimpleMarkdown {
   } as const
   private readonly inlineRules: InlineRule[]
 
-  constructor(options: SimpleMarkdownOptions = {}) {
+  constructor(options: TinyMarkMarkdOptions = {}) {
     this.options = {
       bold: options.bold ?? true,
       italic: options.italic ?? true,
@@ -278,72 +279,4 @@ export class SimpleMarkdown {
   }
 }
 
-/* Example:
-const parser = new SimpleMarkdown();
-console.log(parser.parse(`# Title
-
-Wrapped
-paragraph
-continues here.
-
-- First
-- Second with **bold** and *italic*
-- Use \\*asterisks\\* literally
-
-10. starts at ten
-11. next
-
-Done.`));
-*/
-
-// Example usage:
-// const parser = new SimpleMarkdown({
-//   bold: true,
-//   italic: true,
-//   headers: true,
-//   unorderedLists: true,
-//   orderedLists: true,
-//   classes: {
-//     paragraph: 'text-base',
-//     header: 'font-bold',
-//     unorderedList: 'list-disc ml-4'
-//   }
-// });
-
-const mockMark = `
- **Main argument**: The author discusses the structure and properties of protons, emphasizing their role as fundamental particles in atomic nuclei and their classification as baryons. The text highlights the composition of protons (three valence quarks, two up quarks, one down quark) and the strong force mediated by gluons, as well as the historical context of the proton's discovery and its significance in particle physics.
-
-**Key points**:
-- Protons are composed of three valence quarks (up, up, down) and are baryons.
-- Protons are spin-¹/² fermions and are part of hadrons.
-- The strong force (mediated by gluons) holds protons together.
-- Protons have a positive charge distribution and are used in particle accelerators.
-
-**Important data**:
-- Protons are stable subatomic particles with a positive electric charge.
-- Protons are composed of two up quarks and one down quark.
-- Protons are classified as baryons.
-- Protons are fundamental particles in atomic nuclei.
-
-**Summary**:
-The author's main argument is to explain the structure and significance of protons, emphasizing their role in atomic nuclei and their classification as baryons.`
-
-const markdown = `# Main Title
-
-This is a **bold** paragraph with *italic* text.
-
-## Subtitle
-
-Another paragraph here.
-
-### Lists
-
-- First item
-- Second item with **bold** text
-- Third item
-
-1. First numbered item
-2. Second numbered item
-3. Third numbered item
-
-Final paragraph.`
+export default TinyMark
