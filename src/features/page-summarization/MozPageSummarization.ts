@@ -223,7 +223,7 @@ class MozPageSummarization extends LitElement {
   async initData() {
     const {
       last_page_summarization,
-      mock_su
+      mock_summary_database,
       last_page_summarization_prompt,
     } = await browser.storage.local.get([
       LocalStorageKeys.LAST_PAGE_SUMMARIZATION,
@@ -270,7 +270,7 @@ class MozPageSummarization extends LitElement {
       [LocalStorageKeys.LAST_PAGE_SUMMARIZATION]: this.response,
     })
     this.currentSummary = {
-      result: message.result,
+      result: formattedResponse,
       prompt: message.prompt,
       url: message.url,
       siteName: message.siteName,

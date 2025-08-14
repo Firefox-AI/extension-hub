@@ -30,7 +30,7 @@ interface InlineRule {
 const NORMALIZE_LINE_ENDINGS_PATTERN = /\r\n?/g
 const ESCAPED_MARKDOWN_EMPHASIS_PATTERN = /\\([*_])/g
 const HTML_ESCAPE_CHARS = /[&<>"'/]/g
-// The Following patters have backtracking removed for performance
+// The Following patterns have backtracking removed for performance
 const UNESCAPED_SINGLE_ASTERISK_ITALIC_PATTERN = /(?<!\\)\*([^\n*]+?)\*/g
 const UNESCAPED_SINGLE_UNDERSCORE_ITALIC_BOUNDARY_PATTERN =
   /(?<!\\)(?<![\p{L}\p{N}])_([^\n_]+?)_(?![\p{L}\p{N}])/gu
@@ -194,7 +194,7 @@ class TinyMark {
   }
 
   /**
-   *
+   * Processes inline markdown syntax (such as bold and italic), escapes HTML to prevent injection,
    *
    * @param text
    * @returns
