@@ -211,7 +211,7 @@ export default class extends ExtensionAPI {
                 excerpt: story.excerpt,
                 score: lazy.cosSim(contextEmbedding, storyEmbeddings[index]),
               }))
-              .filter((match: SemanticMatchT) => (match.score ?? 0) > 0.25)
+              .filter((match: SemanticMatchT) => (match.score ?? 0) > 0.2)
               .sort(
                 (a: SemanticMatchT, b: SemanticMatchT) =>
                   (b.score ?? 0) - (a.score ?? 0),

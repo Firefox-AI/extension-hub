@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit'
 import { mlBrowserT } from '../../types'
+import { getOpenAIChatResponseWithModel } from '../services/openai'
 
 type TabItem = {
   id?: number
@@ -34,6 +35,7 @@ type SemanticMatches = {
   domainTabs: SemanticMatch[]
   history: SemanticMatch[]
   stories: SemanticMatch[]
+  suggestedQueries: SemanticMatch[]
 }
 
 class MozSemanticSearch extends LitElement {
@@ -46,6 +48,7 @@ class MozSemanticSearch extends LitElement {
     domainTabs: [],
     history: [],
     stories: [],
+    suggestedQueries: [],
   }
   matchesLoading = false
   selectedMatches = {
@@ -53,20 +56,24 @@ class MozSemanticSearch extends LitElement {
     domainTabs: new Set<number>(),
     history: new Set<number>(),
     stories: new Set<number>(),
+    suggestedQueries: new Set<number>(),
   }
   selectAllStates = {
     tabs: false,
     domainTabs: false,
     history: false,
     stories: false,
+    suggestedQueries: false,
   }
   openedTabIds = {
     tabs: new Map<number, number>(), // index -> tabId
     domainTabs: new Map<number, number>(),
     history: new Map<number, number>(),
     stories: new Map<number, number>(),
+    suggestedQueries: new Map<number, number>(),
   }
   customPrompt = ''
+  debounceTimeout: number | null = null
   defaultPrompts = [
     'Make a plan based on these pages',
     'Compare and contrast these pages',
@@ -77,6 +84,9 @@ class MozSemanticSearch extends LitElement {
     'Generate questions for deeper investigation',
     'Synthesize insights into a brief report',
   ]
+  contextualPrompts: string[] = []
+  showingContextualPrompts = false
+  generatingPrompts = false
 
   static get properties() {
     return {
@@ -91,6 +101,9 @@ class MozSemanticSearch extends LitElement {
       openedTabIds: { type: Object },
       customPrompt: { type: String },
       defaultPrompts: { type: Array },
+      contextualPrompts: { type: Array },
+      showingContextualPrompts: { type: Boolean },
+      generatingPrompts: { type: Boolean },
     }
   }
 
@@ -101,6 +114,15 @@ class MozSemanticSearch extends LitElement {
   connectedCallback() {
     super.connectedCallback()
     this.loadContextData()
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    // Clear debounce timeout on component cleanup
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout)
+      this.debounceTimeout = null
+    }
   }
 
   async loadContextData() {
@@ -188,6 +210,10 @@ class MozSemanticSearch extends LitElement {
       this.selectedContext = title
     }
 
+    // Reset contextual prompts when context changes
+    this.contextualPrompts = []
+    this.showingContextualPrompts = false
+
     // Fetch semantic matches when context is selected
     if (this.selectedContext.trim()) {
       this.fetchSemanticMatches(this.selectedContext)
@@ -209,8 +235,15 @@ class MozSemanticSearch extends LitElement {
       // Update selected context if already selected
       if (this.contextItems[manualIndex].selected) {
         this.selectedContext = this.manualInput
+
+        // Reset contextual prompts when manual input changes
+        this.contextualPrompts = []
+        this.showingContextualPrompts = false
+
         if (this.selectedContext.trim()) {
           this.fetchSemanticMatches(this.selectedContext)
+          // Use debounced query generation for manual input
+          this.debouncedGenerateSuggestedQueries(this.selectedContext)
         }
       }
     }
@@ -234,6 +267,157 @@ class MozSemanticSearch extends LitElement {
       return this.extractDomain(this.manualInput) || this.manualInput
     }
     return ''
+  }
+
+  getAdditionalContextHints(): string {
+    // Collect other context items as hints (excluding the selected one and manual if empty)
+    const selectedItem = this.contextItems.find((item) => item.selected)
+    const otherContextItems = this.contextItems.filter((item) => {
+      if (item.selected) return false
+      if (item.type === 'manual' && !this.manualInput.trim()) return false
+      return true
+    })
+
+    let contextHints = `\nCurrent time: ${new Date()}`
+    if (otherContextItems.length > 0) {
+      const hints = otherContextItems
+        .map((item) => {
+          if (item.type === 'manual') return this.manualInput
+          return item.title
+        })
+        .join(', ')
+      contextHints += `\nAdditional context hints (may be unrelated): ${hints}`
+    }
+
+    return contextHints
+  }
+
+  async generateSuggestedQueries(context: string): Promise<SemanticMatch[]> {
+    try {
+      const contextHints = this.getAdditionalContextHints()
+
+      const prompt = `Based on this primary context: "${context}"${contextHints}
+
+Generate 5 diverse search queries that would help explore and research this topic further. These should be different types of queries that provide complementary perspectives:
+
+1. A factual/informational query
+2. A how-to/practical query
+3. A comparison/analysis query
+4. A recent developments/news query
+5. A deeper research/academic query
+
+The additional context hints may provide related topics or themes, but focus primarily on the main context. Use the hints only as light inspiration if relevant.
+
+Return only the search queries, one per line, without numbers, quotes or bullets.`
+
+      console.log('suggested queries', prompt)
+      const response = await getOpenAIChatResponseWithModel(prompt, 'gpt-4o')
+      if (response.content) {
+        const queries = response.content
+          .split('\n')
+          .map((query: string) => query.trim())
+          .filter((query: string) => query.length > 0)
+          .slice(0, 5)
+
+        return queries.map((query: string) => ({
+          title: query,
+          url: `https://www.google.com/search?client=firefox-b-1-d&q=${encodeURIComponent(query)}`,
+          excerpt: '',
+          score: undefined,
+        }))
+      }
+
+      return []
+    } catch (error) {
+      console.error('Failed to generate suggested queries:', error)
+      return []
+    }
+  }
+
+  debouncedGenerateSuggestedQueries(searchString: string) {
+    // Clear existing timeout
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout)
+    }
+
+    // Set new timeout for 500ms delay
+    this.debounceTimeout = window.setTimeout(() => {
+      this.generateSuggestedQueries(searchString).then(async (matches) => {
+        this.semanticMatches = {
+          ...this.semanticMatches,
+          suggestedQueries: matches,
+        }
+        await this.autoSelectMatches(['suggestedQueries'])
+        this.requestUpdate()
+      })
+    }, 500)
+  }
+
+  async generateContextualPrompts(): Promise<string[]> {
+    try {
+      const selectedUrls = this.getSelectedMatchUrls()
+      if (selectedUrls.length === 0) {
+        return []
+      }
+
+      // Create a description of the workspace items
+      const workspaceDescription = this.getWorkspaceDescription()
+      const contextHints = this.getAdditionalContextHints()
+
+      const prompt = `Based on the selected context "${this.selectedContext}" and the following workspace items: ${workspaceDescription}\n\n${contextHints}
+
+Generate 5 conversation prompts that would be ideal for a chatbot to help analyze, synthesize, or work with this specific content. These prompts should be:
+- Directly relevant to the selected workspace items
+- Action-oriented for chatbot interaction
+- Different from generic analysis prompts
+- Focused on practical insights or next steps
+
+Examples of good chatbot prompts:
+- Help me identify the key disagreements between these sources
+- What questions should I ask to validate these findings?
+- Create a decision matrix based on this information
+- Find the gaps in this research and suggest follow-up topics
+
+Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
+
+      console.log('suggested prompts', prompt)
+      const response = await getOpenAIChatResponseWithModel(prompt, 'gpt-4o')
+
+      if (response.content) {
+        const prompts = response.content
+          .split('\n')
+          .map((prompt: string) => prompt.trim())
+          .filter((prompt: string) => prompt.length > 0)
+          .slice(0, 5)
+
+        return prompts
+      }
+
+      return []
+    } catch (error) {
+      console.error('Failed to generate contextual prompts:', error)
+      return []
+    }
+  }
+
+  getWorkspaceDescription(): string {
+    const descriptions: string[] = []
+
+    // Add selected items by type
+    for (const [type, selectedIndexes] of Object.entries(
+      this.selectedMatches,
+    )) {
+      if (selectedIndexes.size > 0) {
+        const matches = this.semanticMatches[type as keyof SemanticMatches]
+        descriptions.push(
+          ...Array.from(selectedIndexes).map(
+            (index) => matches[index]?.title || 'Untitled',
+          ),
+        )
+      }
+    }
+
+    return descriptions.join(', ')
   }
 
   async fetchSemanticMatches(searchString: string) {
@@ -262,10 +446,19 @@ class MozSemanticSearch extends LitElement {
         (tab) => !semanticTabUrls.has(tab.url),
       )
 
-      // Remove selected context from semantic history
+      // Remove selected context and Google search URLs from semantic history
       const selectedItem = this.contextItems.find((item) => item.selected)
       const filteredHistory = (history || []).filter((item) => {
-        return item.url !== selectedItem?.content
+        // Filter out selected context
+        if (item.url === selectedItem?.content) return false
+
+        // Filter out semantic tabs
+        if (semanticTabUrls.has(item.url)) return false
+
+        // Filter out Google search URLs
+        if (item.url?.includes('google.com/search')) return false
+
+        return true
       })
 
       this.semanticMatches = {
@@ -273,6 +466,7 @@ class MozSemanticSearch extends LitElement {
         domainTabs: filteredDomainTabs,
         history: filteredHistory,
         stories: stories || [],
+        suggestedQueries: [],
       }
 
       // Reset selections when new matches are loaded
@@ -281,12 +475,14 @@ class MozSemanticSearch extends LitElement {
         domainTabs: new Set(),
         history: new Set(),
         stories: new Set(),
+        suggestedQueries: new Set(),
       }
       this.selectAllStates = {
         tabs: false,
         domainTabs: false,
         history: false,
         stories: false,
+        suggestedQueries: false,
       }
 
       // Close any previously opened tabs
@@ -296,6 +492,23 @@ class MozSemanticSearch extends LitElement {
         domainTabs: new Map(),
         history: new Map(),
         stories: new Map(),
+        suggestedQueries: new Map(),
+      }
+
+      // Auto-select matches based on criteria (after cleanup)
+      await this.autoSelectMatches()
+
+      // Generate suggested queries separately (async)
+      // For non-manual context, generate immediately
+      if (selectedItem?.type !== 'manual') {
+        this.generateSuggestedQueries(searchString).then(async (matches) => {
+          this.semanticMatches = {
+            ...this.semanticMatches,
+            suggestedQueries: matches,
+          }
+          await this.autoSelectMatches(['suggestedQueries'])
+          this.requestUpdate()
+        })
       }
     } catch (error) {
       console.error('Failed to fetch semantic matches:', error)
@@ -303,7 +516,34 @@ class MozSemanticSearch extends LitElement {
     this.matchesLoading = false
   }
 
-  async handleSelectAll(type: 'tabs' | 'domainTabs' | 'history' | 'stories') {
+  async autoSelectMatches(
+    matchTypes: (keyof SemanticMatches)[] = [
+      'tabs',
+      'domainTabs',
+      'history',
+      'stories',
+    ],
+  ) {
+    for (const type of matchTypes) {
+      const matches = this.semanticMatches[type]
+      if (matches.length === 0) continue
+
+      // Auto-select items with sufficient score
+      for (let index = 0; index < matches.length; index++) {
+        const match = matches[index]
+        if (
+          (type == 'tabs' || (match.score && match.score > 0.25)) &&
+          !this.selectedMatches[type].has(index)
+        ) {
+          await this.handleMatchSelection(type, index)
+        }
+      }
+    }
+  }
+
+  async handleSelectAll(
+    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
+  ) {
     const isSelecting = !this.selectAllStates[type]
     this.selectAllStates = {
       ...this.selectAllStates,
@@ -315,27 +555,25 @@ class MozSemanticSearch extends LitElement {
     )
 
     if (isSelecting) {
-      // Select top 5 matches and open background tabs
-      this.selectedMatches[type] = new Set(topFive)
-
+      // Select top 5 matches using handleMatchSelection
       for (const index of topFive) {
-        const match = this.semanticMatches[type][index]
-        if (match) {
-          await this.openBackgroundTab(match, type, index)
+        if (!this.selectedMatches[type].has(index)) {
+          await this.handleMatchSelection(type, index)
         }
       }
     } else {
-      // Deselect all and close background tabs
+      // Deselect all using handleMatchSelection
       for (const index of topFive) {
-        await this.closeBackgroundTab(type, index)
+        if (this.selectedMatches[type].has(index)) {
+          await this.handleMatchSelection(type, index)
+        }
       }
-      this.selectedMatches[type] = new Set()
     }
     this.requestUpdate()
   }
 
   async handleMatchSelection(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories',
+    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
     index: number,
   ) {
     const newSet = new Set(this.selectedMatches[type])
@@ -366,7 +604,7 @@ class MozSemanticSearch extends LitElement {
 
   async openBackgroundTab(
     match: SemanticMatch,
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories',
+    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
     index: number,
   ) {
     if (match.url && !this.openedTabIds[type].has(index)) {
@@ -383,7 +621,7 @@ class MozSemanticSearch extends LitElement {
   }
 
   async closeBackgroundTab(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories',
+    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
     index: number,
   ) {
     const tabId = this.openedTabIds[type].get(index)
@@ -410,7 +648,7 @@ class MozSemanticSearch extends LitElement {
   }
 
   handleMatchClick(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories',
+    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
     index: number,
   ) {
     // Toggle checkbox selection
@@ -463,6 +701,34 @@ class MozSemanticSearch extends LitElement {
     }
   }
 
+  async handleToggleContextualPrompts() {
+    if (!this.showingContextualPrompts) {
+      // Switch to contextual prompts
+      if (this.contextualPrompts.length === 0) {
+        this.generatingPrompts = true
+        this.requestUpdate()
+
+        const prompts = await this.generateContextualPrompts()
+        this.contextualPrompts = prompts
+        this.generatingPrompts = false
+      }
+      this.showingContextualPrompts = true
+    } else {
+      // Switch back to default prompts
+      this.showingContextualPrompts = false
+    }
+    this.requestUpdate()
+  }
+
+  getCurrentPrompts(): string[] {
+    if (this.showingContextualPrompts) {
+      return this.contextualPrompts.length > 0
+        ? [...this.defaultPrompts.slice(0, 3), ...this.contextualPrompts]
+        : this.defaultPrompts
+    }
+    return this.defaultPrompts
+  }
+
   renderContextItem(item: ContextItem, index: number) {
     if (item.type === 'manual') {
       return html`
@@ -508,11 +774,13 @@ class MozSemanticSearch extends LitElement {
 
     return html`
       <div class="matches-container">
-        ${this.renderMatchType(
-          'tabs',
-          'Semantic Tabs',
-          this.semanticMatches.tabs,
-        )}
+        ${this.semanticMatches.tabs.length > 0
+          ? this.renderMatchType(
+              'tabs',
+              'Semantic Tabs',
+              this.semanticMatches.tabs,
+            )
+          : ''}
         ${this.semanticMatches.domainTabs.length > 0
           ? this.renderMatchType(
               'domainTabs',
@@ -520,22 +788,27 @@ class MozSemanticSearch extends LitElement {
               this.semanticMatches.domainTabs,
             )
           : ''}
-        ${this.renderMatchType(
-          'history',
-          'Semantic History',
-          this.semanticMatches.history,
-        )}
-        ${this.renderMatchType(
-          'stories',
-          'Semantic Stories',
-          this.semanticMatches.stories,
-        )}
+        ${this.semanticMatches.history.length > 0
+          ? this.renderMatchType(
+              'history',
+              'Semantic History',
+              this.semanticMatches.history,
+            )
+          : ''}
+        ${this.renderSuggestedQueries()}
+        ${this.semanticMatches.stories.length > 0
+          ? this.renderMatchType(
+              'stories',
+              'Semantic Stories',
+              this.semanticMatches.stories,
+            )
+          : ''}
       </div>
     `
   }
 
   renderMatchType(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories',
+    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
     label: string,
     matches: SemanticMatch[],
   ) {
@@ -549,7 +822,7 @@ class MozSemanticSearch extends LitElement {
               .checked="${this.selectAllStates[type]}"
               @change="${() => this.handleSelectAll(type)}"
             />
-            Select All Top 5
+            Select All
           </label>
         </div>
 
@@ -598,6 +871,18 @@ class MozSemanticSearch extends LitElement {
     `
   }
 
+  renderSuggestedQueries() {
+    if (this.semanticMatches.suggestedQueries.length === 0) {
+      return ''
+    }
+
+    return this.renderMatchType(
+      'suggestedQueries',
+      'Suggested Search Queries',
+      this.semanticMatches.suggestedQueries,
+    )
+  }
+
   render() {
     return html`
       <div class="semantic-search-container">
@@ -626,7 +911,26 @@ class MozSemanticSearch extends LitElement {
           ${this.selectedContext
             ? html`
                 <div class="workspace-actions-section">
-                  <h2 class="section-title">Send to Firefox Chat</h2>
+                  <h2 class="section-title">
+                    Send to Firefox Chat
+                    ${this.getSelectedMatchUrls().length > 0
+                      ? html` <button
+                          class="toggle-prompts-btn ${this
+                            .showingContextualPrompts
+                            ? 'active'
+                            : ''}"
+                          @click="${this.handleToggleContextualPrompts}"
+                          ?disabled="${this.generatingPrompts ||
+                          this.getSelectedMatchUrls().length === 0}"
+                        >
+                          ${this.generatingPrompts
+                            ? 'Generating...'
+                            : this.showingContextualPrompts
+                              ? '✨ Contextual Prompts'
+                              : '🎯 Get Contextual Prompts'}
+                        </button>`
+                      : null}
+                  </h2>
 
                   ${this.getSelectedMatchUrls().length === 0
                     ? html`
@@ -639,10 +943,13 @@ class MozSemanticSearch extends LitElement {
                           <!-- Prompt Selection -->
                           <div class="prompt-selection-section">
                             <div class="prompt-items">
-                              ${this.defaultPrompts.map(
-                                (prompt) => html`
+                              ${this.getCurrentPrompts().map(
+                                (prompt, index) => html`
                                   <div
-                                    class="prompt-item"
+                                    class="prompt-item ${index >= 3 &&
+                                    this.showingContextualPrompts
+                                      ? 'contextual'
+                                      : ''}"
                                     @click="${() =>
                                       this.handleDefaultPromptClick(prompt)}"
                                   >
@@ -861,7 +1168,7 @@ class MozSemanticSearch extends LitElement {
 
       .matches-container {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 20px;
       }
 
@@ -954,6 +1261,7 @@ class MozSemanticSearch extends LitElement {
         opacity: 0.8;
         margin-bottom: 4px;
         line-height: 1.4;
+        word-break: break-all;
       }
 
       .match-score {
@@ -1044,6 +1352,35 @@ class MozSemanticSearch extends LitElement {
         margin-bottom: 20px;
       }
 
+      .toggle-prompts-btn {
+        padding: 8px 16px;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--color-fg);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .toggle-prompts-btn:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.5);
+        transform: translateY(-1px);
+      }
+
+      .toggle-prompts-btn.active {
+        background: var(--color-primary);
+        border-color: var(--color-primary);
+      }
+
+      .toggle-prompts-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: rgba(255, 255, 255, 0.05);
+      }
+
       .prompt-items {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -1080,6 +1417,16 @@ class MozSemanticSearch extends LitElement {
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
+      }
+
+      .prompt-item.contextual {
+        background: linear-gradient(
+          135deg,
+          var(--color-card-bg) 80%,
+          rgba(150, 102, 255, 0.2),
+          rgba(150, 102, 255, 0.1)
+        );
+        border-color: rgba(150, 102, 255, 0.3);
       }
 
       .prompt-title {
