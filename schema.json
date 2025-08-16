@@ -61,6 +61,17 @@
           }
         ],
         "type": "function"
+      },
+      {
+        "async": true,
+        "name": "getBoolPref",
+        "parameters": [
+          {
+            "name": "prefName",
+            "type": "string"
+          }
+        ],
+        "type": "function"
       }
     ],
     "namespace": "extensionHub"

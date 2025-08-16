@@ -1,6 +1,28 @@
 import { LitElement, html, css } from 'lit'
 import { mlBrowserT } from '../../types'
 import { getOpenAIChatResponseWithModel } from '../services/openai'
+import { LocalStorageKeys } from '../../const'
+
+// Constants
+type MatchType =
+  | 'tabs'
+  | 'domainTabs'
+  | 'history'
+  | 'stories'
+  | 'suggestedQueries'
+
+const SEMANTIC_SEARCH_CONFIG = {
+  DEBOUNCE_DELAY: 500,
+  MAX_TABS: 6,
+  MAX_SEARCHES: 2,
+  MAX_MATCHES: 5,
+  AUTO_SELECTION_THRESHOLD: 0.25,
+  HISTORY_DAYS: 7,
+  MAX_HISTORY_RESULTS: 10,
+  URL_PREVIEW_LIMIT: 3,
+  TABS_PER_CYCLE: 3,
+  SEARCH_CYCLES: 2,
+} as const
 
 type TabItem = {
   id?: number
@@ -30,48 +52,23 @@ type SemanticMatch = {
   selected?: boolean
 }
 
-type SemanticMatches = {
-  tabs: SemanticMatch[]
-  domainTabs: SemanticMatch[]
-  history: SemanticMatch[]
-  stories: SemanticMatch[]
-  suggestedQueries: SemanticMatch[]
-}
+type SemanticMatches = Record<MatchType, SemanticMatch[]>
+
+// Component state types
+type SelectionState = Record<MatchType, Set<number>>
+type SelectAllState = Record<MatchType, boolean>
+type OpenedTabsState = Record<MatchType, Map<number, number>>
 
 class MozSemanticSearch extends LitElement {
   contextItems: ContextItem[] = []
   selectedContext = ''
   manualInput = ''
   loading = true
-  semanticMatches: SemanticMatches = {
-    tabs: [],
-    domainTabs: [],
-    history: [],
-    stories: [],
-    suggestedQueries: [],
-  }
+  semanticMatches: SemanticMatches = this.createEmptySemanticMatches()
   matchesLoading = false
-  selectedMatches = {
-    tabs: new Set<number>(),
-    domainTabs: new Set<number>(),
-    history: new Set<number>(),
-    stories: new Set<number>(),
-    suggestedQueries: new Set<number>(),
-  }
-  selectAllStates = {
-    tabs: false,
-    domainTabs: false,
-    history: false,
-    stories: false,
-    suggestedQueries: false,
-  }
-  openedTabIds = {
-    tabs: new Map<number, number>(), // index -> tabId
-    domainTabs: new Map<number, number>(),
-    history: new Map<number, number>(),
-    stories: new Map<number, number>(),
-    suggestedQueries: new Map<number, number>(),
-  }
+  selectedMatches: SelectionState = this.createEmptySelectionState()
+  selectAllStates: SelectAllState = this.createEmptySelectAllState()
+  openedTabIds: OpenedTabsState = this.createEmptyOpenedTabsState()
   customPrompt = ''
   debounceTimeout: number | null = null
   defaultPrompts = [
@@ -87,6 +84,8 @@ class MozSemanticSearch extends LitElement {
   contextualPrompts: string[] = []
   showingContextualPrompts = false
   generatingPrompts = false
+  hasOpenAIKey = false
+  hasSemanticHistoryFeature = false
 
   static get properties() {
     return {
@@ -104,6 +103,8 @@ class MozSemanticSearch extends LitElement {
       contextualPrompts: { type: Array },
       showingContextualPrompts: { type: Boolean },
       generatingPrompts: { type: Boolean },
+      hasOpenAIKey: { type: Boolean },
+      hasSemanticHistoryFeature: { type: Boolean },
     }
   }
 
@@ -111,9 +112,52 @@ class MozSemanticSearch extends LitElement {
     super()
   }
 
+  // Factory functions for state initialization
+  private createEmptySelectionState(): SelectionState {
+    return {
+      tabs: new Set<number>(),
+      domainTabs: new Set<number>(),
+      history: new Set<number>(),
+      stories: new Set<number>(),
+      suggestedQueries: new Set<number>(),
+    }
+  }
+
+  private createEmptySelectAllState(): SelectAllState {
+    return {
+      tabs: false,
+      domainTabs: false,
+      history: false,
+      stories: false,
+      suggestedQueries: false,
+    }
+  }
+
+  private createEmptyOpenedTabsState(): OpenedTabsState {
+    return {
+      tabs: new Map<number, number>(),
+      domainTabs: new Map<number, number>(),
+      history: new Map<number, number>(),
+      stories: new Map<number, number>(),
+      suggestedQueries: new Map<number, number>(),
+    }
+  }
+
+  private createEmptySemanticMatches(): SemanticMatches {
+    return {
+      tabs: [],
+      domainTabs: [],
+      history: [],
+      stories: [],
+      suggestedQueries: [],
+    }
+  }
+
   connectedCallback() {
     super.connectedCallback()
     this.loadContextData()
+    this.checkOpenAIKey()
+    this.checkSemanticHistoryFeature()
   }
 
   disconnectedCallback() {
@@ -122,6 +166,35 @@ class MozSemanticSearch extends LitElement {
     if (this.debounceTimeout) {
       clearTimeout(this.debounceTimeout)
       this.debounceTimeout = null
+    }
+  }
+
+  async checkOpenAIKey() {
+    try {
+      // Check if OpenAI key is available by attempting a simple validation
+      const { openai_api_key } = await browser.storage.local.get([
+        LocalStorageKeys.OPENAI_API_KEY,
+      ])
+      this.hasOpenAIKey = !!(openai_api_key && openai_api_key.trim())
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Failed to check OpenAI key:', error)
+      this.hasOpenAIKey = false
+      this.requestUpdate()
+    }
+  }
+
+  async checkSemanticHistoryFeature() {
+    try {
+      const isEnabled = await (
+        browser as unknown as mlBrowserT
+      ).extensionHub.getBoolPref('places.semanticHistory.featureGate')
+      this.hasSemanticHistoryFeature = isEnabled
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Failed to check semantic history feature gate:', error)
+      this.hasSemanticHistoryFeature = false
+      this.requestUpdate()
     }
   }
 
@@ -134,8 +207,21 @@ class MozSemanticSearch extends LitElement {
 
       const items: ContextItem[] = []
 
-      for (let i = 0; i < 3; i++) {
-        if (tabs[i]) {
+      // Pattern: 3 recent tabs, 1 recent search, 3 more recent tabs, 1 more recent search, manual entry
+      // Loop through cycles: each cycle adds tabs + 1 search
+      for (
+        let cycle = 0;
+        cycle < SEMANTIC_SEARCH_CONFIG.SEARCH_CYCLES;
+        cycle++
+      ) {
+        const tabStartIndex = cycle * SEMANTIC_SEARCH_CONFIG.TABS_PER_CYCLE
+        const tabEndIndex = Math.min(
+          tabStartIndex + SEMANTIC_SEARCH_CONFIG.TABS_PER_CYCLE,
+          tabs.length,
+        )
+
+        // Add tabs for this cycle
+        for (let i = tabStartIndex; i < tabEndIndex; i++) {
           items.push({
             type: 'tab',
             title: tabs[i].title || 'Untitled Tab',
@@ -143,19 +229,21 @@ class MozSemanticSearch extends LitElement {
           })
         }
 
-        if (history[i] && i < 2) {
-          const title = (history[i].title || 'Untitled Search').replace(
+        // Add 1 search for this cycle
+        if (history[cycle]) {
+          const title = (history[cycle].title || 'Untitled Search').replace(
             ' - Google Search',
             '',
           )
           items.push({
             type: 'history',
             title,
-            content: history[i].url || '',
+            content: history[cycle].url || '',
           })
         }
       }
 
+      // Add manual entry last
       items.push({
         type: 'manual',
         title: 'Manual Entry',
@@ -177,7 +265,7 @@ class MozSemanticSearch extends LitElement {
       const sortedTabs = tabs
         .filter((tab) => tab.lastAccessed) // Filter out tabs without lastAccessed
         .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))
-      return sortedTabs.slice(0, 3)
+      return sortedTabs.slice(0, SEMANTIC_SEARCH_CONFIG.MAX_TABS)
     } catch (error) {
       console.error('Failed to fetch tabs:', error)
       return []
@@ -186,12 +274,20 @@ class MozSemanticSearch extends LitElement {
 
   async fetchRecentSearches(): Promise<HistoryItem[]> {
     try {
+      // Get searches from the past week
+      const oneWeekAgo =
+        Date.now() - SEMANTIC_SEARCH_CONFIG.HISTORY_DAYS * 24 * 60 * 60 * 1000
+
       const history = await browser.history.search({
         text: 'google.com/search',
-        startTime: 0,
-        maxResults: 3,
+        startTime: oneWeekAgo,
+        maxResults: SEMANTIC_SEARCH_CONFIG.MAX_HISTORY_RESULTS,
       })
+
+      // Sort by most recent first and filter to get clean results
       return history
+        .sort((a, b) => (b.lastVisitTime || 0) - (a.lastVisitTime || 0))
+        .slice(0, SEMANTIC_SEARCH_CONFIG.MAX_SEARCHES)
     } catch (error) {
       console.error('Failed to fetch history:', error)
       return []
@@ -317,7 +413,7 @@ Return only the search queries, one per line, without numbers, quotes or bullets
           .split('\n')
           .map((query: string) => query.trim())
           .filter((query: string) => query.length > 0)
-          .slice(0, 5)
+          .slice(0, SEMANTIC_SEARCH_CONFIG.MAX_MATCHES)
 
         return queries.map((query: string) => ({
           title: query,
@@ -340,7 +436,12 @@ Return only the search queries, one per line, without numbers, quotes or bullets
       clearTimeout(this.debounceTimeout)
     }
 
-    // Set new timeout for 500ms delay
+    // Only generate if OpenAI key is available
+    if (!this.hasOpenAIKey) {
+      return
+    }
+
+    // Set new timeout
     this.debounceTimeout = window.setTimeout(() => {
       this.generateSuggestedQueries(searchString).then(async (matches) => {
         this.semanticMatches = {
@@ -350,7 +451,7 @@ Return only the search queries, one per line, without numbers, quotes or bullets
         await this.autoSelectMatches(['suggestedQueries'])
         this.requestUpdate()
       })
-    }, 500)
+    }, SEMANTIC_SEARCH_CONFIG.DEBOUNCE_DELAY)
   }
 
   async generateContextualPrompts(): Promise<string[]> {
@@ -388,7 +489,7 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
           .split('\n')
           .map((prompt: string) => prompt.trim())
           .filter((prompt: string) => prompt.length > 0)
-          .slice(0, 5)
+          .slice(0, SEMANTIC_SEARCH_CONFIG.MAX_MATCHES)
 
         return prompts
       }
@@ -470,37 +571,19 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
       }
 
       // Reset selections when new matches are loaded
-      this.selectedMatches = {
-        tabs: new Set(),
-        domainTabs: new Set(),
-        history: new Set(),
-        stories: new Set(),
-        suggestedQueries: new Set(),
-      }
-      this.selectAllStates = {
-        tabs: false,
-        domainTabs: false,
-        history: false,
-        stories: false,
-        suggestedQueries: false,
-      }
+      this.selectedMatches = this.createEmptySelectionState()
+      this.selectAllStates = this.createEmptySelectAllState()
 
       // Close any previously opened tabs
       await this.closeAllOpenedTabs()
-      this.openedTabIds = {
-        tabs: new Map(),
-        domainTabs: new Map(),
-        history: new Map(),
-        stories: new Map(),
-        suggestedQueries: new Map(),
-      }
+      this.openedTabIds = this.createEmptyOpenedTabsState()
 
       // Auto-select matches based on criteria (after cleanup)
       await this.autoSelectMatches()
 
       // Generate suggested queries separately (async)
-      // For non-manual context, generate immediately
-      if (selectedItem?.type !== 'manual') {
+      // For non-manual context, generate immediately (if OpenAI key is available)
+      if (selectedItem?.type !== 'manual' && this.hasOpenAIKey) {
         this.generateSuggestedQueries(searchString).then(async (matches) => {
           this.semanticMatches = {
             ...this.semanticMatches,
@@ -532,7 +615,9 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
       for (let index = 0; index < matches.length; index++) {
         const match = matches[index]
         if (
-          (type == 'tabs' || (match.score && match.score > 0.25)) &&
+          (type == 'tabs' ||
+            (match.score &&
+              match.score > SEMANTIC_SEARCH_CONFIG.AUTO_SELECTION_THRESHOLD)) &&
           !this.selectedMatches[type].has(index)
         ) {
           await this.handleMatchSelection(type, index)
@@ -541,29 +626,28 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
     }
   }
 
-  async handleSelectAll(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
-  ) {
+  async handleSelectAll(type: MatchType) {
     const isSelecting = !this.selectAllStates[type]
     this.selectAllStates = {
       ...this.selectAllStates,
       [type]: isSelecting,
     }
 
-    const topFive = [0, 1, 2, 3, 4].filter(
-      (i) => i < this.semanticMatches[type].length,
-    )
+    const topMatches = Array.from(
+      { length: SEMANTIC_SEARCH_CONFIG.MAX_MATCHES },
+      (_, i) => i,
+    ).filter((i) => i < this.semanticMatches[type].length)
 
     if (isSelecting) {
-      // Select top 5 matches using handleMatchSelection
-      for (const index of topFive) {
+      // Select top matches using handleMatchSelection
+      for (const index of topMatches) {
         if (!this.selectedMatches[type].has(index)) {
           await this.handleMatchSelection(type, index)
         }
       }
     } else {
       // Deselect all using handleMatchSelection
-      for (const index of topFive) {
+      for (const index of topMatches) {
         if (this.selectedMatches[type].has(index)) {
           await this.handleMatchSelection(type, index)
         }
@@ -572,10 +656,7 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
     this.requestUpdate()
   }
 
-  async handleMatchSelection(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
-    index: number,
-  ) {
+  async handleMatchSelection(type: MatchType, index: number) {
     const newSet = new Set(this.selectedMatches[type])
     const wasSelected = newSet.has(index)
 
@@ -595,16 +676,17 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
     this.selectedMatches[type] = newSet
 
     // Update select all state
-    const topFive = [0, 1, 2, 3, 4].filter(
-      (i) => i < this.semanticMatches[type].length,
-    )
-    this.selectAllStates[type] = topFive.every((i) => newSet.has(i))
+    const topMatches = Array.from(
+      { length: SEMANTIC_SEARCH_CONFIG.MAX_MATCHES },
+      (_, i) => i,
+    ).filter((i) => i < this.semanticMatches[type].length)
+    this.selectAllStates[type] = topMatches.every((i) => newSet.has(i))
     this.requestUpdate()
   }
 
   async openBackgroundTab(
     match: SemanticMatch,
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
+    type: MatchType,
     index: number,
   ) {
     if (match.url && !this.openedTabIds[type].has(index)) {
@@ -620,10 +702,7 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
     }
   }
 
-  async closeBackgroundTab(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
-    index: number,
-  ) {
+  async closeBackgroundTab(type: MatchType, index: number) {
     const tabId = this.openedTabIds[type].get(index)
     if (tabId) {
       try {
@@ -647,12 +726,28 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
     }
   }
 
-  handleMatchClick(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
-    index: number,
-  ) {
+  handleMatchClick(type: MatchType, index: number) {
     // Toggle checkbox selection
     this.handleMatchSelection(type, index)
+  }
+
+  hasAnySelectedMatches(): boolean {
+    return Object.values(this.selectedMatches).some((set) => set.size > 0)
+  }
+
+  async handleDeselectAll() {
+    // Iterate through all match types and deselect each selected item
+    for (const [type, selectedIndexes] of Object.entries(
+      this.selectedMatches,
+    )) {
+      const matchType = type as keyof typeof this.selectedMatches
+      // Create a copy of the set to iterate over since handleMatchSelection modifies the original
+      const indicesToDeselect = Array.from(selectedIndexes)
+
+      for (const index of indicesToDeselect) {
+        await this.handleMatchSelection(matchType, index)
+      }
+    }
   }
 
   getSelectedMatchUrls(): string[] {
@@ -794,7 +889,12 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
               'Semantic History',
               this.semanticMatches.history,
             )
-          : ''}
+          : !this.hasSemanticHistoryFeature
+            ? this.renderFeatureNote(
+                'Semantic History',
+                'Enable places.semanticHistory.featureGate in about:config',
+              )
+            : ''}
         ${this.renderSuggestedQueries()}
         ${this.semanticMatches.stories.length > 0
           ? this.renderMatchType(
@@ -807,11 +907,7 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
     `
   }
 
-  renderMatchType(
-    type: 'tabs' | 'domainTabs' | 'history' | 'stories' | 'suggestedQueries',
-    label: string,
-    matches: SemanticMatch[],
-  ) {
+  renderMatchType(type: MatchType, label: string, matches: SemanticMatch[]) {
     return html`
       <div class="match-type-section">
         <div class="match-type-header">
@@ -871,8 +967,28 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
     `
   }
 
+  renderFeatureNote(title: string, message: string) {
+    return html`
+      <div class="match-type-section">
+        <div class="match-type-header">
+          <h3 class="match-type-title">${title}</h3>
+        </div>
+        <div class="feature-note">
+          <div class="feature-note-icon">ℹ️</div>
+          <div class="feature-note-text">${message}</div>
+        </div>
+      </div>
+    `
+  }
+
   renderSuggestedQueries() {
     if (this.semanticMatches.suggestedQueries.length === 0) {
+      if (!this.hasOpenAIKey) {
+        return this.renderFeatureNote(
+          'Suggested Search Queries',
+          'OpenAI API key required for query generation',
+        )
+      }
       return ''
     }
 
@@ -903,7 +1019,19 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
 
           <!-- Part 2: Semantic Matches -->
           <div class="semantic-matches-section">
-            <h2 class="section-title">Add to Workspace</h2>
+            <div class="section-header">
+              <h2 class="section-title">Add to Workspace</h2>
+              ${this.hasAnySelectedMatches()
+                ? html`
+                    <button
+                      class="deselect-all-btn"
+                      @click="${this.handleDeselectAll}"
+                    >
+                      🗑️ Deselect All
+                    </button>
+                  `
+                : ''}
+            </div>
             <div class="matches-display">${this.renderSemanticMatches()}</div>
           </div>
 
@@ -921,13 +1049,16 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
                             : ''}"
                           @click="${this.handleToggleContextualPrompts}"
                           ?disabled="${this.generatingPrompts ||
-                          this.getSelectedMatchUrls().length === 0}"
+                          this.getSelectedMatchUrls().length === 0 ||
+                          !this.hasOpenAIKey}"
                         >
                           ${this.generatingPrompts
                             ? 'Generating...'
-                            : this.showingContextualPrompts
-                              ? '✨ Contextual Prompts'
-                              : '🎯 Get Contextual Prompts'}
+                            : !this.hasOpenAIKey
+                              ? '🔑 Contextual Prompts use OpenAI Key'
+                              : this.showingContextualPrompts
+                                ? '✨ Contextual Prompts'
+                                : '🎯 Get Contextual Prompts'}
                         </button>`
                       : null}
                   </h2>
@@ -984,17 +1115,22 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
                             >
                             <div class="urls-list">
                               ${this.getSelectedMatchUrls()
-                                .slice(0, 3)
+                                .slice(
+                                  0,
+                                  SEMANTIC_SEARCH_CONFIG.URL_PREVIEW_LIMIT,
+                                )
                                 .map(
                                   (url) => html`
                                     <div class="url-item">${url}</div>
                                   `,
                                 )}
-                              ${this.getSelectedMatchUrls().length > 3
+                              ${this.getSelectedMatchUrls().length >
+                              SEMANTIC_SEARCH_CONFIG.URL_PREVIEW_LIMIT
                                 ? html`
                                     <div class="url-item">
                                       ...and
-                                      ${this.getSelectedMatchUrls().length - 3}
+                                      ${this.getSelectedMatchUrls().length -
+                                      SEMANTIC_SEARCH_CONFIG.URL_PREVIEW_LIMIT}
                                       more
                                     </div>
                                   `
@@ -1152,6 +1288,34 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
         padding: 30px;
       }
 
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .deselect-all-btn {
+        padding: 8px 16px;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--color-fg);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .deselect-all-btn:hover {
+        background: rgba(255, 0, 0, 0.2);
+        border-color: rgba(255, 0, 0, 0.5);
+        transform: translateY(-1px);
+      }
+
       .context-preview {
         font-size: 16px;
         line-height: 1.5;
@@ -1276,6 +1440,28 @@ Return only the 5 prompts, one per line, without numbers, quotes or bullets.`
         font-style: italic;
         text-align: center;
         padding: 40px;
+      }
+
+      .feature-note {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        margin: 8px 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .feature-note-icon {
+        font-size: 16px;
+        opacity: 0.8;
+      }
+
+      .feature-note-text {
+        font-size: 14px;
+        opacity: 0.8;
+        line-height: 1.4;
       }
 
       /* Part 3: Workspace Actions Styles */

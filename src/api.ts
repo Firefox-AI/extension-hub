@@ -236,6 +236,15 @@ export default class extends ExtensionAPI {
             console.error('Failed to ask chat:', error)
           }
         },
+
+        async getBoolPref(prefName: string): Promise<boolean> {
+          try {
+            return Services.prefs.getBoolPref(prefName, false)
+          } catch (error) {
+            console.error(`Failed to get bool pref ${prefName}:`, error)
+            return false
+          }
+        },
       },
     }
   }

@@ -19,6 +19,7 @@ export type mlBrowserT = {
     semanticStories: (searchString: string) => Promise<SemanticMatchT[]>
     domainTabs: (domain: string) => Promise<SemanticMatchT[]>
     askChat: (prompt: string) => Promise<void>
+    getBoolPref: (prefName: string) => Promise<boolean>
   }
   trial?: {
     ml: {
