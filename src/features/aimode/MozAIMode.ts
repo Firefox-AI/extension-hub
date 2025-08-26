@@ -121,7 +121,6 @@ class MozAIMode extends LitElement {
         height: calc(100vh - 100px);
         max-height: calc(100vh - 100px);
         display: flex;
-
         flex-direction: column;
         border-radius: 8px;
         font-size: 14px;
@@ -130,7 +129,6 @@ class MozAIMode extends LitElement {
           var(--color-gradient-start),
           var(--color-gradient-end)
         );
-        display: flex;
       }
 
       .header {

@@ -51,7 +51,7 @@ class MozAIModePage extends LitElement {
             <div class="content-wrapper">
               <!-- LOGO -->
               <div class="branding" data-fa-i2svg="disabled">
-                <image
+                <img
                   data-fa-i2svg="disabled"
                   src=${aiModeLogo}
                   alt="AI Mode Logo"
