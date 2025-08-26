@@ -41,6 +41,7 @@ export type MessageTypesT =
   | 'planner'
   | 'planner_result'
   | 'planner_followup'
+  | 'aimode_search_action'
 
 export type PromptDataT = {
   prompt: string

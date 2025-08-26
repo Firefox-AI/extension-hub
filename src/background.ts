@@ -88,51 +88,6 @@ const messageHandlers: Partial<Record<MessageTypesT, MessageHandler>> = {
   pages_open: (data) => {
     pageLauncher(data.page)
   },
-
-  // homepage_action_click: (data) => {
-  //   console.log('[BG] Homepage action clicked:', data)
-
-  //   // You can implement specific logic for each action here
-  //   switch (data.topic) {
-  //     case 'Whistler, BC':
-  //       // Handle tab summarization for Whistler, BC
-  //       console.log('[BG] Triggering tab summarization for Whistler, BC')
-  //       break
-  //     case 'Local mode':
-  //       // Handle local mode activation
-  //       console.log(
-  //         '[BG] Activating local mode for location-based recommendations',
-  //       )
-  //       break
-  //     case 'Compare tabs':
-  //       // Handle tab comparison
-  //       console.log('[BG] Triggering tab comparison for recommendations')
-  //       break
-  //     case 'Soundtrack my trip':
-  //       // Handle playlist creation
-  //       console.log('[BG] Triggering playlist creation based on destination')
-  //       break
-  //     default:
-  //       console.log('[BG] Unknown homepage action:', data.topic)
-  //   }
-  // },
-
-  // homepage_search_action: (data) => {
-  //   console.log('[BG] Homepage search action:', data)
-
-  //   switch (data.action) {
-  //     case 'add_files':
-  //       console.log('[BG] Triggering file/image/tabs addition interface')
-  //       // You could open a file picker or show UI for adding content
-  //       break
-  //     case 'voice_input':
-  //       console.log('[BG] Triggering voice input interface')
-  //       // You could activate speech recognition or show voice UI
-  //       break
-  //     default:
-  //       console.log('[BG] Unknown search action:', data.action)
-  //   }
-  // },
 }
 
 browser.runtime.onInstalled.addListener(() => {

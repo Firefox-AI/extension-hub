@@ -39,9 +39,9 @@ class MozExtensionHubDash extends LitElement {
           </button>
           <button
             class="settings-button"
-            @click="${() => this.handlePageClick('homepage.html')}"
+            @click="${() => this.handlePageClick('aiModePage.html')}"
           >
-            Open homepage
+            Open Ai Mode Page
           </button>
         </div>
       </div>

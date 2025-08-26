@@ -5,6 +5,7 @@ import './MozEngineWarning'
 
 type FeatureOption = {
   value:
+    | 'ai_mode'
     | 'attribute_comparison'
     | 'chat'
     | 'conversational_onboarding'
@@ -20,6 +21,15 @@ type FeatureOption = {
 }
 
 const FEATURE_OPTIONS: FeatureOption[] = [
+  {
+    value: 'ai_mode',
+    label: 'AI Mode',
+    component: () =>
+      html`<moz-ai-mode>
+        <i class="fa-solid fa-bars" slot="menu-icon"></i>
+        <i class="fa-solid fa-expand" slot="expand-icon"></i>
+      </moz-ai-mode>`,
+  },
   {
     value: 'conversational_onboarding',
     label: 'Conversational Onboarding',
@@ -88,20 +98,6 @@ class MozExtensionHub extends LitElement {
 
   createRenderRoot() {
     return this
-  }
-
-  connectedCallback() {
-    super.connectedCallback()
-    browser.runtime.onMessage.addListener(this.handleIncomingMessage)
-  }
-
-  handleIncomingMessage = async (message: any) => {
-    if (message.type === 'homepage_action_click') {
-      this.feature = 'page_qa'
-      await browser.storage.local.set({
-        [LocalStorageKeys.CURRENT_FEATURE]: this.feature,
-      })
-    }
   }
 
   async firstUpdated() {

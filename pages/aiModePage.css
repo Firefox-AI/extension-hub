@@ -1,0 +1,243 @@
+:root {
+  /* Primary colors */
+  --color-background: #fff;
+  --color-text: #000;
+  --color-text-primary: #15141a;
+  --color-text-secondary: rgba(21, 20, 26, 0.69);
+
+  /* Background colors */
+  --color-bg-light-gray: #f3f3f3;
+  --color-bg-frame: #f0f0f4;
+  --color-bg-white-75: rgba(255, 255, 255, 0.75);
+  --color-bg-white-86: rgba(255, 255, 255, 0.862);
+
+  /* Gradient colors */
+  --color-gradient-start: #e8b4f3;
+  --color-gradient-end: #ffe0ec;
+
+  /* Border colors */
+  --color-border-gray: #bebebe;
+  --color-border-focus: #5a9be5;
+  --color-border-light: rgba(21, 20, 26, 0.1);
+
+  /* Shadow colors */
+  --color-shadow-light: rgba(0, 0, 0, 0.05);
+  --color-shadow-medium: rgba(0, 0, 0, 0.1);
+  --color-shadow-dark: rgba(0, 0, 0, 0.15);
+  --color-shadow-darker: rgba(0, 0, 0, 0.35);
+
+  /* Icon colors */
+  --color-icon-gray: #5b5b66;
+
+  /* Misc */
+  --color-hover-bg: rgba(0, 0, 0, 0.05);
+
+  /* button colors */
+  --color-button-bg: #dcbde6;
+  --color-button-bg-hover: #d8b5e1;
+  --color-button-text: #343434;
+
+  --color-button-clear-bg-hover: #e3e3e3;
+  --color-button-clear-bg: transparent;
+  --color-button-clear-text: #000000;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+.branding {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+
+  img {
+    height: 80px;
+  }
+}
+
+.wrapper {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-light-gray);
+}
+
+.browser-frame {
+  width: 94%;
+  height: 94%;
+  max-width: 1400px;
+  background: var(--color-bg-frame);
+  border-radius: 8px;
+  box-shadow:
+    0 0 20px var(--color-shadow-dark),
+    0 25px 30px var(--color-shadow-darker);
+  overflow: hidden;
+  position: relative;
+}
+
+.main-content {
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.background-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    var(--color-gradient-start),
+    var(--color-gradient-end)
+  );
+}
+
+.content-wrapper {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 40px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.search-bar {
+  width: 100%;
+  max-width: 900px;
+  background: var(--color-bg-white-86);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow:
+    0 0.375px 1.5px var(--color-shadow-light),
+    0 3px 12px var(--color-shadow-medium);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 2px solid var(--color-border-gray);
+}
+
+.search-bar:has(.search-input:focus) {
+  border: 2px solid var(--color-border-focus);
+}
+
+.search-input {
+  padding: 10px;
+  background: transparent;
+  border-bottom: 1px solid var(--color-border-light);
+  font-size: 15.5px;
+  color: var(--color-text-secondary);
+  border: none;
+  outline: none;
+}
+
+.search-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+}
+
+.add-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.add-button:hover {
+  background-color: var(--color-hover-bg);
+}
+
+.plus-icon {
+  font-size: 16px;
+  color: var(--color-icon-gray);
+}
+
+.add-text {
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 1200px) {
+  .smart-actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .smart-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .content-wrapper {
+    padding: 20px;
+  }
+}
+
+/**
+  * Buttons
+*/
+.clear-button {
+  border: none;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  background-color: var(--color-button-clear-bg);
+  color: var(--color-button-clear-text);
+  padding: 8px 12px;
+}
+
+.clear-button:hover {
+  background-color: var(--color-button-clear-bg-hover);
+}
+
+.primary-button {
+  background-color: var(--color-button-bg);
+  color: var(--color-button-text);
+  border: none;
+  padding: 14px 18px;
+  border-radius: 18px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.primary-button:hover {
+  background-color: var(--color-button-bg-hover);
+}
+
+/* Utility classes */
+.flex {
+  display: flex;
+}
+.items-center {
+  align-items: center;
+}
+.justify-center {
+  justify-content: center;
+}
+.gap-4 {
+  gap: 4px;
+}
