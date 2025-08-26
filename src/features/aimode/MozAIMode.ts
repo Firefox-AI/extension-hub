@@ -16,6 +16,7 @@ class MozAIMode extends LitElement {
   connectedCallback() {
     super.connectedCallback()
     browser.runtime.onMessage.addListener(this.handleIncomingMessage)
+    browser.runtime.sendMessage({ type: 'aimode_sidebar_ready' })
   }
 
   handleIncomingMessage = async (message: any) => {

@@ -25,8 +25,15 @@ class MozAIModePage extends LitElement {
   async handleSearchAction(action: string) {
     try {
       await browser.sidebarAction.open()
-      // Set a slight delay to ensure the sidebar is fully open
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      await new Promise((resolve) => {
+        function onMessage(message: any) {
+          if (message && message.type === 'aimode_sidebar_ready') {
+            browser.runtime.onMessage.removeListener(onMessage)
+            resolve(undefined)
+          }
+        }
+        browser.runtime.onMessage.addListener(onMessage)
+      })
       await browser.runtime.sendMessage({
         type: 'aimode_search_action',
         data: {
