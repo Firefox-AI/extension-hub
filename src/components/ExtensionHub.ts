@@ -10,6 +10,7 @@ type FeatureOption = {
     | 'conversational_onboarding'
     | 'extensionhub_dashboard'
     | 'page_qa'
+    | 'page_qa_endpoint'
     | 'page_summarization'
     | 'plan_checklist'
     | 'tab_summarization'
@@ -29,6 +30,11 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     value: 'page_qa',
     label: 'Page Q&A',
     component: () => html`<moz-question-answer></moz-question-answer>`,
+  },
+  {
+    value: 'page_qa_endpoint',
+    label: 'Page Q&A - PageBuddy',
+    component: () => html`<moz-question-answer-endpoint></moz-question-answer-endpoing>`,
   },
   {
     value: 'page_summarization',

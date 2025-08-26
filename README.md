@@ -225,15 +225,5 @@ Now navigate to a page and ask a question:
 ## FAQ
 ### How can I load the extension hub into Firefox directly? 
 
-In some cases, you may wish to use a custom version of Firefox. In others, you may wish to pass the extension to a product manager. In order to do this, you will need to load the extension using the following process: 
-
-Open Firefox (Nightly)
-
-Naviate to `about:debugging` and click `This Nightly`
-
-![This nightly](assets/this_nightly.png)
-
-Under `Temporary Extensions` click `Load Temporary Add-on...` This will open a file navigator. Open the file called `manifest.json` from with the `extension-hub` base directory. Voila! 
-
-![manifest.json](assets/manifest_json.png)
+In some cases, you may wish to use a custom version of Firefox. In others, you may wish to pass the extension to a product manager. In order to do this, you will need to load the extension using the following process outlined on this [Confluence page](https://mozilla-hub.atlassian.net/wiki/spaces/FAAMT/pages/1691616001/How+to+load+extensions).
 

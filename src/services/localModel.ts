@@ -44,3 +44,47 @@ export const getLocalModelResponse = async (
     return 'An unexpected error occurred while contacting the local model.'
   }
 }
+
+export const getEndpointModelResponse = async (
+  question: string, context: string
+) => {
+  try {
+    const { local_model_url, local_model_name } =
+      await browser.storage.local.get([
+        LocalStorageKeys.LOCAL_MODEL_URL,
+        LocalStorageKeys.LOCAL_MODEL_NAME,
+      ])
+
+    if (!local_model_url || local_model_name === '') {
+      return 'Local model URL is not set. Please configure it in the extension settings.'
+    }
+
+    console.log(`Reached: getEndpointModelResponse. Sending query to: ${local_model_url}`)
+
+    const response = await fetch(local_model_url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+
+      body: JSON.stringify({
+        "question": question, 
+        "page_content": context,
+        "return_context": true
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    console.log("Received response", response)
+    const data = await response.json()
+    console.log("Returning data: ", data)
+
+    return data || 'No response from local model.'
+  } catch (error) {
+    console.error('Error fetching local model response:', error)
+    return 'An unexpected error occurred while contacting the local model.'
+  }
+}

@@ -41,6 +41,7 @@ export type MessageTypesT =
   | 'planner'
   | 'planner_result'
   | 'planner_followup'
+  | 'page_qa_endpoint'
 
 export type PromptDataT = {
   prompt: string
