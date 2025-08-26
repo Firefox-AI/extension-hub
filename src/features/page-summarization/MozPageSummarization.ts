@@ -4,6 +4,7 @@ import { marked } from 'marked'
 import { LocalStorageKeys } from '../../../const'
 import './MozPageSummaryHistory'
 import { CurrentSummaryT, SummaryHistoryItemT } from '../../../types'
+import { pageRestrictionService } from '../../services/pageRestriction'
 
 const PROMPT_OPTIONS = [
   'Can you summarize this page?',
@@ -246,7 +247,7 @@ class MozPageSummarization extends LitElement {
       if (info.menuItemId !== ContextMenuIds.TEXT_SELECTION_SUMMARIZATION)
         return
       console.log(
-        `Context menu clicked:${info.selectionText} in tab ${tab?.url}`
+        `Context menu clicked:${info.selectionText} in tab ${tab?.url}`,
       )
     })
   }
@@ -276,7 +277,14 @@ class MozPageSummarization extends LitElement {
     }
   }
 
-  handlePromptSubmit() {
+  async handlePromptSubmit() {
+    const safetyCheck = await pageRestrictionService.checkPageRestricted()
+
+    if (safetyCheck.isRestricted) {
+      alert(`This page is restricted: ${safetyCheck.reason}`)
+      return
+    }
+
     if (!this.prompt) {
       this.prompt = PROMPT_OPTIONS[0]
     }
@@ -306,7 +314,7 @@ class MozPageSummarization extends LitElement {
     }
 
     const { mock_summary_database } = await browser.storage.local.get(
-      LocalStorageKeys.MOCK_SUMMARY_DATABASE
+      LocalStorageKeys.MOCK_SUMMARY_DATABASE,
     )
 
     const newSummary: SummaryHistoryItemT = {
@@ -331,7 +339,7 @@ class MozPageSummarization extends LitElement {
     this.showHistory = !this.showHistory
     if (this.showHistory) {
       const { mock_summary_database } = await browser.storage.local.get(
-        LocalStorageKeys.MOCK_SUMMARY_DATABASE
+        LocalStorageKeys.MOCK_SUMMARY_DATABASE,
       )
       this.history = mock_summary_database || []
     }
@@ -426,7 +434,7 @@ class MozPageSummarization extends LitElement {
                             >
                               ${option}
                             </button>
-                          `
+                          `,
                         )}
                       </div>
                       <div class="bank-actions-wrapper">
@@ -435,7 +443,7 @@ class MozPageSummarization extends LitElement {
                             class="primary-button"
                             @click=${() => {
                               alert(
-                                'Custom prompt functionality not implemented yet. - NG'
+                                'Custom prompt functionality not implemented yet. - NG',
                               )
                             }}
                           >
