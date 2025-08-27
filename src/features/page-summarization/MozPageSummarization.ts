@@ -258,22 +258,22 @@ class MozPageSummarization extends LitElement {
   }
 
   handleIncomingMessage = async (message: any) => {
-    if (message.type === 'page_summarize_result') {
-      const formattedResponse = await marked.parse(message.result)
-      this.loading = false
-      this.response = formattedResponse
-        ? formattedResponse
-        : 'No response received. Please try again.'
-      this.showSaveButton = true
-      browser.storage.local.set({
-        [LocalStorageKeys.LAST_PAGE_SUMMARIZATION]: this.response,
-      })
-      this.currentSummary = {
-        result: formattedResponse,
-        prompt: message.prompt,
-        url: message.url,
-        siteName: message.siteName,
-      }
+    if (message.type !== 'page_summarize_result') return
+
+    const formattedResponse = await marked.parse(message.result)
+    this.loading = false
+    this.response = formattedResponse
+      ? formattedResponse
+      : 'No response received. Please try again.'
+    this.showSaveButton = true
+    browser.storage.local.set({
+      [LocalStorageKeys.LAST_PAGE_SUMMARIZATION]: this.response,
+    })
+    this.currentSummary = {
+      result: formattedResponse,
+      prompt: message.prompt,
+      url: message.url,
+      siteName: message.siteName,
     }
   }
 
