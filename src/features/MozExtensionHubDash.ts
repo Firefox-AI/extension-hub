@@ -39,9 +39,15 @@ class MozExtensionHubDash extends LitElement {
           </button>
           <button
             class="settings-button"
+            @click="${() => this.handlePageClick('semantic-search.html')}"
+          > 
+            Open semantic search page
+          </button>
+          <button
+            Open AI Mode Page
             @click="${() => this.handlePageClick('aiModePage.html')}"
           >
-            Open AI Mode Page
+            Open AI Mode
           </button>
         </div>
       </div>

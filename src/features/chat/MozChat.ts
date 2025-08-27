@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../../const'
+import TinyMark from '../../services/tinyMark'
 import { pageRestrictionService } from '../../services/pageRestriction'
 
 type ChatMessageT = {
@@ -13,12 +14,14 @@ class MozChat extends LitElement {
   inputValue = ''
   loading = false
   hasSystemMessage = true // disabling this for the time being -- see not below
+  tinyMark: TinyMark
 
   static get properties() {
     return {
       messages: { type: Array },
       inputValue: { type: String },
       loading: { type: Boolean },
+      tinyMark: { type: Object },
     }
   }
 
@@ -27,6 +30,7 @@ class MozChat extends LitElement {
     this.messages = []
     this.inputValue = ''
     this.loading = false
+    this.tinyMark = new TinyMark()
   }
 
   connectedCallback() {
@@ -37,7 +41,6 @@ class MozChat extends LitElement {
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'chat_message_result') {
-      console.log('[handleIncomingMessage]', message)
       const response = message.result
       this.loading = false
 
@@ -143,10 +146,7 @@ class MozChat extends LitElement {
         // Insert page content before the last user message
         messagesToSend.splice(lastUserIndex, 0, {
           role: 'system',
-          content: `Here is the page content:\n\n${pageContent.textContent.slice(
-            0,
-            1000,
-          )}`,
+          content: `Here is the page content:\n\n${pageContent.textContent.slice(0, 1000)}`,
         })
       }
     }
@@ -189,7 +189,10 @@ class MozChat extends LitElement {
               (msg) => html`
                 <div class="bubble-wrapper ${msg.role}">
                   <div class="bubble ${msg.role}">
-                    <div class="text">${msg.content}</div>
+                    <div
+                      class="text"
+                      .innerHTML=${this.tinyMark.parse(msg.content)}
+                    ></div>
                   </div>
                 </div>
               `,

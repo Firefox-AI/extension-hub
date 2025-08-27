@@ -10,7 +10,7 @@ import {
 } from '../../types'
 
 export const getPageAssistResponse = async (
-  pageAssistantData: MessagePageAssistT
+  pageAssistantData: MessagePageAssistT,
 ) => {
   const { prompt, textContent } = pageAssistantData
   // Note there is also the option to use local storage inputs from preferences page
@@ -59,7 +59,7 @@ export const getPageAssistResponse = async (
     'Page Assistant response:',
     response,
     typeof response,
-    final_answer
+    final_answer,
   )
 
   return final_answer

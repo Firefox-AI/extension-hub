@@ -6,6 +6,72 @@
         "name": "getTabs",
         "parameters": [],
         "type": "function"
+      },
+      {
+        "async": true,
+        "name": "semanticTabs",
+        "parameters": [
+          {
+            "name": "searchString",
+            "type": "string"
+          }
+        ],
+        "type": "function"
+      },
+      {
+        "async": true,
+        "name": "semanticHistory",
+        "parameters": [
+          {
+            "name": "searchString",
+            "type": "string"
+          }
+        ],
+        "type": "function"
+      },
+      {
+        "async": true,
+        "name": "semanticStories",
+        "parameters": [
+          {
+            "name": "searchString",
+            "type": "string"
+          }
+        ],
+        "type": "function"
+      },
+      {
+        "async": true,
+        "name": "domainTabs",
+        "parameters": [
+          {
+            "name": "domain",
+            "type": "string"
+          }
+        ],
+        "type": "function"
+      },
+      {
+        "async": true,
+        "name": "askChat",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string"
+          }
+        ],
+        "type": "function"
+      },
+      {
+        "async": true,
+        "name": "getBoolPref",
+        "parameters": [
+          {
+            "name": "prefName",
+            "type": "string"
+          }
+        ],
+        "type": "function"
       }
     ],
     "namespace": "extensionHub"
