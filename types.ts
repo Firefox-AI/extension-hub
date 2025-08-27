@@ -1,6 +1,25 @@
+export type SemanticMatchT = {
+  title: string
+  url?: string
+  score?: number
+  excerpt?: string
+}
+
+export type SemanticMatchResultT = {
+  tabs: SemanticMatchT[]
+  history: SemanticMatchT[]
+  stories: SemanticMatchT[]
+}
+
 export type mlBrowserT = {
   extensionHub: {
     getTabs: () => Promise<TabsCollectionT>
+    semanticTabs: (searchString: string) => Promise<SemanticMatchT[]>
+    semanticHistory: (searchString: string) => Promise<SemanticMatchT[]>
+    semanticStories: (searchString: string) => Promise<SemanticMatchT[]>
+    domainTabs: (domain: string) => Promise<SemanticMatchT[]>
+    askChat: (prompt: string) => Promise<void>
+    getBoolPref: (prefName: string) => Promise<boolean>
   }
   trial?: {
     ml: {

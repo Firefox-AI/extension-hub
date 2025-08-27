@@ -37,6 +37,12 @@ class MozExtensionHubDash extends LitElement {
           >
             Open onboarding page
           </button>
+          <button
+            class="settings-button"
+            @click="${() => this.handlePageClick('semantic-search.html')}"
+          >
+            Open semantic search page
+          </button>
         </div>
       </div>
     `
