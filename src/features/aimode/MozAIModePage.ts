@@ -1,7 +1,9 @@
 import { LitElement, html } from 'lit'
 import aiModeLogo from '../../../assets/ai-mode-logo.png'
-import { getOpenAIChatResponseWithModel } from '../../services/openai'
-import { LocalStorageKeys } from '../../../const'
+import {
+  getOpenAIChatResponseWithModel,
+  OpenAIKeyManager,
+} from '../../services/openai'
 
 class MozAIModePage extends LitElement {
   query: string = ''
@@ -9,6 +11,7 @@ class MozAIModePage extends LitElement {
   aiResponse: string = ''
   showSearchFallback: boolean = false
   isProcessing: boolean = false
+  private keyStatusCleanup?: () => void
 
   static get properties() {
     return {
@@ -26,21 +29,24 @@ class MozAIModePage extends LitElement {
 
   connectedCallback() {
     super.connectedCallback()
-    this.checkOpenAIKey()
+    this.initializeOpenAIKeyStatus()
   }
 
-  async checkOpenAIKey() {
-    try {
-      const { openai_api_key } = await browser.storage.local.get([
-        LocalStorageKeys.OPENAI_API_KEY,
-      ])
-      this.hasOpenAIKey = !!(openai_api_key && openai_api_key.trim())
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    this.keyStatusCleanup?.()
+  }
+
+  async initializeOpenAIKeyStatus() {
+    // Set up listener for key status changes
+    this.keyStatusCleanup = OpenAIKeyManager.addListener((hasKey) => {
+      this.hasOpenAIKey = hasKey
       this.requestUpdate()
-    } catch (error) {
-      console.error('Failed to check OpenAI key:', error)
-      this.hasOpenAIKey = false
-      this.requestUpdate()
-    }
+    })
+
+    // Get initial key status
+    this.hasOpenAIKey = await OpenAIKeyManager.checkOpenAIKey()
+    this.requestUpdate()
   }
 
   createRenderRoot() {

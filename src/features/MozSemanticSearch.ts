@@ -1,7 +1,9 @@
 import { LitElement, html, css } from 'lit'
 import { mlBrowserT } from '../../types'
-import { getOpenAIChatResponseWithModel } from '../services/openai'
-import { LocalStorageKeys } from '../../const'
+import {
+  getOpenAIChatResponseWithModel,
+  OpenAIKeyManager,
+} from '../services/openai'
 
 // Constants
 type MatchType =
@@ -86,6 +88,7 @@ class MozSemanticSearch extends LitElement {
   generatingPrompts = false
   hasOpenAIKey = false
   hasSemanticHistoryFeature = false
+  private keyStatusCleanup?: () => void
 
   static get properties() {
     return {
@@ -156,7 +159,7 @@ class MozSemanticSearch extends LitElement {
   connectedCallback() {
     super.connectedCallback()
     this.loadContextData()
-    this.checkOpenAIKey()
+    this.initializeOpenAIKeyStatus()
     this.checkSemanticHistoryFeature()
   }
 
@@ -167,21 +170,19 @@ class MozSemanticSearch extends LitElement {
       clearTimeout(this.debounceTimeout)
       this.debounceTimeout = null
     }
+    this.keyStatusCleanup?.()
   }
 
-  async checkOpenAIKey() {
-    try {
-      // Check if OpenAI key is available by attempting a simple validation
-      const { openai_api_key } = await browser.storage.local.get([
-        LocalStorageKeys.OPENAI_API_KEY,
-      ])
-      this.hasOpenAIKey = !!(openai_api_key && openai_api_key.trim())
+  async initializeOpenAIKeyStatus() {
+    // Set up listener for key status changes
+    this.keyStatusCleanup = OpenAIKeyManager.addListener((hasKey) => {
+      this.hasOpenAIKey = hasKey
       this.requestUpdate()
-    } catch (error) {
-      console.error('Failed to check OpenAI key:', error)
-      this.hasOpenAIKey = false
-      this.requestUpdate()
-    }
+    })
+
+    // Get initial key status
+    this.hasOpenAIKey = await OpenAIKeyManager.checkOpenAIKey()
+    this.requestUpdate()
   }
 
   async checkSemanticHistoryFeature() {
