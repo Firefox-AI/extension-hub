@@ -1,11 +1,21 @@
 import { LitElement, html, css } from 'lit'
+import { getOpenAIChatResponseWithModel } from '../../services/openai'
+import { LocalStorageKeys } from '../../../const'
 
 class MozAIMode extends LitElement {
   query: string = ''
+  hasOpenAIKey: boolean = false
+  aiResponse: string = ''
+  showSummarizeButton: boolean = false
+  isProcessing: boolean = false
 
   static get properties() {
     return {
       query: { type: String },
+      hasOpenAIKey: { type: Boolean },
+      aiResponse: { type: String },
+      showSummarizeButton: { type: Boolean },
+      isProcessing: { type: Boolean },
     }
   }
 
@@ -17,12 +27,83 @@ class MozAIMode extends LitElement {
     super.connectedCallback()
     browser.runtime.onMessage.addListener(this.handleIncomingMessage)
     browser.runtime.sendMessage({ type: 'aimode_sidebar_ready' })
+    this.checkOpenAIKey()
+  }
+
+  async checkOpenAIKey() {
+    try {
+      const { openai_api_key } = await browser.storage.local.get([
+        LocalStorageKeys.OPENAI_API_KEY,
+      ])
+      this.hasOpenAIKey = !!(openai_api_key && openai_api_key.trim())
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Failed to check OpenAI key:', error)
+      this.hasOpenAIKey = false
+      this.requestUpdate()
+    }
   }
 
   handleIncomingMessage = async (message: any) => {
     if (message.type === 'aimode_search_action') {
+      if (!message.data.action) {
+        // Ping message - respond with ready signal
+        browser.runtime.sendMessage({ type: 'aimode_sidebar_ready' })
+        return
+      }
+
       this.query = message.data.query || ''
+      if (message.data.aiResponse) {
+        this.aiResponse = message.data.aiResponse
+        this.showSummarizeButton = true
+        this.requestUpdate()
+      }
     }
+  }
+
+  async handleSummarizePage() {
+    if (!this.hasOpenAIKey) return
+
+    this.isProcessing = true
+    this.requestUpdate()
+
+    try {
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      })
+      const activeTab = tabs[0]
+
+      if (!activeTab?.id) {
+        throw new Error('No active tab found')
+      }
+
+      const results = await browser.tabs.executeScript(activeTab.id, {
+        code: `
+          document.body.innerText || document.body.textContent || '';
+        `,
+      })
+
+      const pageContent = results[0] || ''
+
+      const prompt = `Please provide a concise summary of the following web page content in 2-3 paragraphs:
+
+${pageContent.slice(0, 4000)}`
+
+      const response = await getOpenAIChatResponseWithModel(prompt, 'gpt-4o')
+
+      if (response.content) {
+        this.aiResponse = response.content
+      } else {
+        this.aiResponse = 'Sorry, I encountered an error summarizing this page.'
+      }
+    } catch (error) {
+      console.error('Error summarizing page:', error)
+      this.aiResponse = 'Sorry, I encountered an error summarizing this page.'
+    }
+
+    this.isProcessing = false
+    this.requestUpdate()
   }
 
   handleCloseClick() {
@@ -58,6 +139,43 @@ class MozAIMode extends LitElement {
           </div>
 
           <div class="content">
+            <!-- OPENAI KEY WARNING -->
+            ${!this.hasOpenAIKey
+              ? html`
+                  <div class="openai-warning">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    OpenAI API key required for AI responses. Add key in
+                    Extension Hub settings.
+                  </div>
+                `
+              : ''}
+
+            <!-- AI RESPONSE SECTION -->
+            ${this.aiResponse || this.isProcessing
+              ? html`
+                  <div class="ai-response-section">
+                    ${this.isProcessing
+                      ? html`
+                          <div class="ai-loading">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            Processing...
+                          </div>
+                        `
+                      : html`
+                          <div class="ai-response">
+                            <div class="ai-response-header">
+                              <i class="fa-solid fa-robot"></i>
+                              Mina's Response
+                            </div>
+                            <div class="ai-response-content">
+                              ${this.aiResponse}
+                            </div>
+                          </div>
+                        `}
+                  </div>
+                `
+              : ''}
+
             <textarea
               .value="${this.query}"
               @input="${(e: Event) =>
@@ -65,7 +183,22 @@ class MozAIMode extends LitElement {
               class="query-input"
               placeholder="Type your query here..."
             ></textarea>
-            <button class="primary-button">Submit</button>
+
+            <div class="button-row">
+              <button class="primary-button">Submit</button>
+              ${this.showSummarizeButton
+                ? html`
+                    <button
+                      class="primary-button"
+                      @click="${this.handleSummarizePage}"
+                      ?disabled="${!this.hasOpenAIKey || this.isProcessing}"
+                    >
+                      <i class="fa-solid fa-file-lines"></i>
+                      Summarize Page
+                    </button>
+                  `
+                : ''}
+            </div>
           </div>
         </div>
       </div>
@@ -207,6 +340,70 @@ class MozAIMode extends LitElement {
 
       .primary-button:hover {
         background-color: var(--color-button-bg-hover);
+      }
+
+      .primary-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .button-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .openai-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        border: 1px solid #ffeaa7;
+      }
+
+      .ai-response-section {
+        margin-bottom: 12px;
+      }
+
+      .ai-loading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px;
+        background-color: var(--color-background);
+        border-radius: 4px;
+        font-size: 12px;
+      }
+
+      .ai-response {
+        background-color: var(--color-background);
+        border-radius: 4px;
+        border: 1px solid var(--color-border-light);
+      }
+
+      .ai-response-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background-color: var(--header-background);
+        border-bottom: 1px solid var(--color-border-light);
+        font-size: 12px;
+        font-weight: bold;
+        border-top-left-radius: 4px;
+        border-top-right-radius: 4px;
+      }
+
+      .ai-response-content {
+        padding: 12px;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
       }
     `
   }
