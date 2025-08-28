@@ -5,6 +5,7 @@ import './MozEngineWarning'
 
 type FeatureOption = {
   value:
+    | 'ai_mode'
     | 'attribute_comparison'
     | 'chat'
     | 'conversational_onboarding'
@@ -22,9 +23,19 @@ type FeatureOption = {
 
 const FEATURE_OPTIONS: FeatureOption[] = [
   {
+    value: 'ai_mode',
+    label: 'AI Mode',
+    component: () =>
+      html`<moz-ai-mode>
+        <i class="fa-solid fa-bars" slot="menu-icon"></i>
+        <i class="fa-solid fa-expand" slot="expand-icon"></i>
+      </moz-ai-mode>`,
+  },
+  {
     value: 'conversational_onboarding',
     label: 'Conversational Onboarding',
-    component: () => html`<moz-conversational-onboarding></moz-conversational-onboarding>`,
+    component: () =>
+      html`<moz-conversational-onboarding></moz-conversational-onboarding>`,
   },
   {
     value: 'page_qa',
@@ -65,7 +76,8 @@ const FEATURE_OPTIONS: FeatureOption[] = [
   {
     value: 'attribute_comparison',
     label: 'Attribute Comparison',
-    component: () => html`<moz-attribute-comparison></moz-attribute-comparison>`,
+    component: () =>
+      html`<moz-attribute-comparison></moz-attribute-comparison>`,
   },
   {
     value: 'tabs_debug',
@@ -124,7 +136,11 @@ class MozExtensionHub extends LitElement {
         <moz-engine-download-progress></moz-engine-download-progress>
         <moz-engine-warning></moz-engine-warning>
         <div class="header">
-          <select class="select" @change="${this.handleSelectChange}">
+          <select
+            class="select"
+            @change="${this.handleSelectChange}"
+            value="${this.feature}"
+          >
             ${FEATURE_OPTIONS.map(
               (opt) =>
                 html`<option

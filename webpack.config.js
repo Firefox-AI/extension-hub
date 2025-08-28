@@ -36,12 +36,19 @@ module.exports = {
         use: ['style-loader', 'css-loader'],
         exclude: /node_modules/,
       },
+      {
+        test: /\.(png|jpg|jpeg|gif|svg|webp)$/i,
+        type: 'asset/resource',
+        generator: {
+          filename: 'assets/[name][ext]',
+        },
+      },
     ],
   },
   devtool: 'cheap-module-source-map',
   plugins: [
     new Dotenv({
-      safe: false
+      safe: false,
     }),
   ],
 }
