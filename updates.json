@@ -3,9 +3,9 @@
     "extensionHub@mozilla.org": {
       "updates": [
         {
-          "version": "1.4",
+          "version": "1.5",
           "update_link": "https://raw.githubusercontent.com/Firefox-AI/extension-hub/refs/heads/main/extension-hub.xpi",
-          "update_hash": "sha256:d404774f1e40ad28fb39ed8d790b521d1020f095d29d3f736e0f0812e3ddfee8"
+          "update_hash": "sha256:c3f1acbf6f9eec540e1721ba6756c67a1cdc517b902e451766634c09d7f189c8"
         }
       ]
     }
