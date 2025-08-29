@@ -29,6 +29,10 @@ export enum LocalStorageKeys {
 
   // Chat
   CHAT_HISTORY = 'chat_history',
+
+  // AI Mode
+  AI_MODE_CHATS = 'ai_mode_chats',
+  AI_MODE_PERSISTENCE_MODE = 'ai_mode_persistence_mode',
 }
 
 export enum SessionStorageKeys {
