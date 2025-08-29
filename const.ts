@@ -3,6 +3,7 @@ export enum LocalStorageKeys {
   CURRENT_FEATURE = 'current_feature',
   LAST_TAB_SUMMARIZATION = 'last_tab_summarization',
   LAST_QUESTION_ANSWER = 'last_question_answer',
+  LAST_QUESTION_ANSWER_DURATION = 'last_question_answer_duration',
 
   // Hugging Face
   HUGGING_FACE_API_KEY = 'hugging_face_api_key',
