@@ -20,7 +20,6 @@ class MozQuestionAnswerEndpoint extends FeatureViewMixin(LitElement) {
     prompt: { type: String },
     loading: { type: Boolean },
     response: { type: String },
-    queryTimer: { type: Number },
   }
 
   static styles = [
@@ -173,7 +172,8 @@ class MozQuestionAnswerEndpoint extends FeatureViewMixin(LitElement) {
                     <p .innerHTML=${this.response}></p>
                   </div>
                   <div>
-                    Query Duration: <b></b>${this.millToSeconds(this.queryTimer)}</b> seconds.
+                    Query Duration:
+                    <b>${this.millToSeconds(this.queryTimer)}</b> seconds.
                   </div>`
               : ''}
 

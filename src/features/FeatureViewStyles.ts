@@ -14,7 +14,6 @@ export const FeatureViewStyles = css`
     --color-gradient-end: #4b4e52;
     --color-primary-disabled: #6d6d6d;
     --color-fg-subtle: #b0b0b0;
-    --color-response-bg: #2d2c2c;
     --color-primary: #007bff;
   }
 
