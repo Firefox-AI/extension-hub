@@ -3,6 +3,8 @@ import {
   getOpenAIChatResponseWithModel,
   OpenAIKeyManager,
 } from '../../services/openai'
+import { LocalStorageKeys } from '../../../const'
+import { AIModeChat, AIModePersisteceMode } from '../../../types'
 
 class MozAIMode extends LitElement {
   query: string = ''
@@ -12,6 +14,15 @@ class MozAIMode extends LitElement {
   isProcessing: boolean = false
   private keyStatusCleanup?: () => void
 
+  chats: AIModeChat[] = []
+  currentChatId: string | null = null
+  persistenceMode: AIModePersisteceMode = AIModePersisteceMode.PER_TAB_GROUP
+  querySuggestions: string[] = []
+  showMenu: boolean = false
+  currentTabId: number | null = null
+  currentGroupId: number | null = null
+  currentWindowId: number | null = null
+
   static get properties() {
     return {
       query: { type: String },
@@ -19,6 +30,11 @@ class MozAIMode extends LitElement {
       aiResponse: { type: String },
       showSummarizeButton: { type: Boolean },
       isProcessing: { type: Boolean },
+      chats: { type: Array },
+      currentChatId: { type: String },
+      persistenceMode: { type: String },
+      querySuggestions: { type: Array },
+      showMenu: { type: Boolean },
     }
   }
 
@@ -26,16 +42,22 @@ class MozAIMode extends LitElement {
     super()
   }
 
-  connectedCallback() {
+  async connectedCallback() {
     super.connectedCallback()
     browser.runtime.onMessage.addListener(this.handleIncomingMessage)
     browser.runtime.sendMessage({ type: 'aimode_sidebar_ready' })
+    browser.tabs.onActivated.addListener(this.handleTabChanged)
+    browser.tabs.onUpdated.addListener(this.handleTabUpdated)
     this.initializeOpenAIKeyStatus()
+    await this.loadChatsAndSettings()
+    await this.updateCurrentTabInfo()
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
     this.keyStatusCleanup?.()
+    browser.tabs.onActivated.removeListener(this.handleTabChanged)
+    browser.tabs.onUpdated.removeListener(this.handleTabUpdated)
   }
 
   async initializeOpenAIKeyStatus() {
@@ -47,6 +69,190 @@ class MozAIMode extends LitElement {
 
     // Get initial key status
     this.hasOpenAIKey = await OpenAIKeyManager.checkOpenAIKey()
+    this.requestUpdate()
+  }
+
+  async loadChatsAndSettings() {
+    try {
+      const { ai_mode_chats, ai_mode_persistence_mode } =
+        await browser.storage.local.get([
+          LocalStorageKeys.AI_MODE_CHATS,
+          LocalStorageKeys.AI_MODE_PERSISTENCE_MODE,
+        ])
+
+      this.chats = ai_mode_chats || []
+      this.persistenceMode =
+        ai_mode_persistence_mode || AIModePersisteceMode.PER_TAB_GROUP
+
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Error loading AI mode data:', error)
+    }
+  }
+
+  async updateCurrentTabInfo() {
+    try {
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      })
+      const activeTab = tabs[0]
+
+      if (activeTab) {
+        this.currentTabId = activeTab.id || null
+        this.currentWindowId = activeTab.windowId || null
+        this.currentGroupId =
+          activeTab.groupId !== -1 ? activeTab.groupId : null
+
+        this.generateQuerySuggestions(activeTab.title || '')
+        this.loadRelevantChat()
+      }
+    } catch (error) {
+      console.error('Error getting current tab info:', error)
+    }
+  }
+
+  generateQuerySuggestions(tabTitle: string) {
+    const words = tabTitle.split(/\s+/).filter((word) => word.length > 2)
+    this.querySuggestions = words.slice(0, 3)
+    this.requestUpdate()
+  }
+
+  loadRelevantChat() {
+    if (!this.currentTabId) return
+
+    let relevantChat: AIModeChat | null = null
+
+    switch (this.persistenceMode) {
+      case AIModePersisteceMode.PER_TAB:
+        relevantChat =
+          this.chats
+            .filter((chat) => chat.tabId === this.currentTabId)
+            .sort((a, b) => b.timestamp - a.timestamp)[0] || null
+        break
+
+      case AIModePersisteceMode.PER_TAB_GROUP:
+        if (this.currentGroupId) {
+          relevantChat =
+            this.chats
+              .filter((chat) => chat.groupId === this.currentGroupId)
+              .sort((a, b) => b.timestamp - a.timestamp)[0] || null
+        } else {
+          relevantChat =
+            this.chats
+              .filter((chat) => chat.tabId === this.currentTabId)
+              .sort((a, b) => b.timestamp - a.timestamp)[0] || null
+        }
+        break
+
+      case AIModePersisteceMode.PER_WINDOW:
+        return
+    }
+
+    if (relevantChat) {
+      this.currentChatId = relevantChat.id
+      this.query = relevantChat.query
+      this.aiResponse = relevantChat.response
+    } else {
+      this.currentChatId = null
+      this.query = ''
+      this.aiResponse = ''
+    }
+
+    this.requestUpdate()
+  }
+
+  handleTabChanged = async (activeInfo: any) => {
+    await this.updateCurrentTabInfo()
+  }
+
+  handleTabUpdated = async (tabId: number, changeInfo: any) => {
+    if (tabId === this.currentTabId && changeInfo.title) {
+      this.generateQuerySuggestions(changeInfo.title)
+    }
+  }
+
+  async saveChats() {
+    try {
+      await browser.storage.local.set({
+        [LocalStorageKeys.AI_MODE_CHATS]: this.chats,
+      })
+    } catch (error) {
+      console.error('Error saving chats:', error)
+    }
+  }
+
+  generateDummyResponse(query: string): string {
+    const responses = [
+      // Tech/Development
+      `Based on your query "${query}", here are some insights: This appears to be related to web development and user experience design. Consider focusing on accessibility and responsive design principles.`,
+      `About "${query}": This involves multiple considerations including performance, security, and maintainability. Would you like me to elaborate on any specific aspect?`,
+      `Your question about "${query}" touches on important technical concepts. The key is to balance functionality with simplicity while ensuring scalability for future needs.`,
+
+      // Food & Cooking
+      `Regarding "${query}": That sounds delicious! For the best results, I'd recommend using fresh, seasonal ingredients. Don't forget to taste as you go and adjust seasoning accordingly.`,
+      `About "${query}": This is a fantastic choice! Consider pairing it with complementary flavors and textures. Presentation can make all the difference too - sometimes simple is best.`,
+      `Looking at "${query}": Great question! The key to success here is timing and temperature. Make sure to prep all your ingredients beforehand for a smooth cooking experience.`,
+
+      // Sports & Fitness
+      `Analyzing "${query}": This is exciting! Proper form and consistency are crucial for success. Start gradually and focus on building good habits rather than pushing too hard too fast.`,
+      `Your question about "${query}" is spot-on! Training smart is more important than training hard. Make sure to include rest and recovery in your routine for optimal results.`,
+      `Regarding "${query}": That's a great goal to work towards! Focus on the fundamentals first, then build complexity. Remember that progress takes time and patience.`,
+
+      // Shopping & Products
+      `About "${query}": Excellent choice to research before buying! I'd recommend comparing features, reading reviews, and considering your long-term needs. Sometimes spending a bit more upfront saves money later.`,
+      `Looking into "${query}": Smart shopping approach! Check for seasonal sales, compare prices across retailers, and don't forget to factor in warranty and customer service quality.`,
+      `Regarding "${query}": That's worth investigating! Consider the total cost of ownership, including maintenance and accessories. User reviews can provide valuable real-world insights.`,
+
+      // Travel & Places
+      `About "${query}": What an exciting destination! I'd suggest checking the best time to visit, local customs, and must-see attractions. Don't over-schedule - leave time for spontaneous discoveries.`,
+      `Your question about "${query}" brings back great memories! Research local transportation options, try authentic local cuisine, and consider staying in neighborhoods where locals live for a more genuine experience.`,
+      `Regarding "${query}": Perfect choice for exploration! Pack light, learn a few basic phrases in the local language, and be open to unexpected adventures. The best travel stories come from unplanned moments.`,
+
+      // General/Versatile
+      `Analyzing "${query}": This is a common challenge many people face. I suggest starting with a minimal approach and iterating based on what works best for your specific situation.`,
+      `Your inquiry about "${query}" is very thoughtful! The best approach often involves breaking it down into smaller, manageable steps and celebrating progress along the way.`,
+      `About "${query}": This is definitely worth exploring further! Consider multiple perspectives, gather information from reliable sources, and trust your instincts when making decisions.`,
+    ]
+    return responses[Math.floor(Math.random() * responses.length)]
+  }
+
+  async handleSubmit() {
+    if (!this.query.trim() || !this.currentTabId) return
+
+    this.isProcessing = true
+    this.requestUpdate()
+
+    try {
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      })
+      const activeTab = tabs[0]
+
+      const newChat: AIModeChat = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        query: this.query,
+        response: this.generateDummyResponse(this.query),
+        timestamp: Date.now(),
+        tabId: this.currentTabId,
+        groupId: this.currentGroupId || undefined,
+        windowId: this.currentWindowId!,
+        tabTitle: activeTab?.title,
+        tabUrl: activeTab?.url,
+      }
+
+      this.chats.unshift(newChat)
+      this.currentChatId = newChat.id
+      this.aiResponse = newChat.response
+
+      await this.saveChats()
+    } catch (error) {
+      console.error('Error handling submit:', error)
+      this.aiResponse = 'Sorry, I encountered an error processing your query.'
+    }
+
+    this.isProcessing = false
     this.requestUpdate()
   }
 
@@ -121,7 +327,40 @@ ${pageContent.slice(0, 4000)}`
   }
 
   handleMenuClick() {
-    // Implement menu functionality if needed
+    this.showMenu = !this.showMenu
+    this.requestUpdate()
+  }
+
+  async handlePersistenceModeChange(mode: AIModePersisteceMode) {
+    this.persistenceMode = mode
+    await browser.storage.local.set({
+      [LocalStorageKeys.AI_MODE_PERSISTENCE_MODE]: mode,
+    })
+    this.loadRelevantChat()
+    this.showMenu = false
+    this.requestUpdate()
+  }
+
+  handleSelectChat(chatId: string) {
+    const chat = this.chats.find((c) => c.id === chatId)
+    if (chat) {
+      this.currentChatId = chatId
+      this.query = chat.query
+      this.aiResponse = chat.response
+      this.showMenu = false
+      this.requestUpdate()
+    }
+  }
+
+  async handleClearChat(chatId: string) {
+    this.chats = this.chats.filter((c) => c.id !== chatId)
+    if (this.currentChatId === chatId) {
+      this.currentChatId = null
+      this.query = ''
+      this.aiResponse = ''
+    }
+    await this.saveChats()
+    this.requestUpdate()
   }
 
   render() {
@@ -129,9 +368,118 @@ ${pageContent.slice(0, 4000)}`
       <div class="wrapper">
         <div class="container">
           <div class="header">
-            <button class="header-button" @click=${this.handleMenuClick}>
-              <slot name="menu-icon">Menu</slot>
-            </button>
+            <div class="menu-container">
+              <button class="header-button" @click=${this.handleMenuClick}>
+                <slot name="menu-icon">Menu</slot>
+              </button>
+              ${this.showMenu
+                ? html`
+                    <div class="menu-dropdown">
+                      <div class="menu-section">
+                        <div class="menu-section-title">Persistence Mode</div>
+                        <button
+                          class="menu-item ${this.persistenceMode ===
+                          AIModePersisteceMode.PER_TAB_GROUP
+                            ? 'active'
+                            : ''}"
+                          @click="${() =>
+                            this.handlePersistenceModeChange(
+                              AIModePersisteceMode.PER_TAB_GROUP,
+                            )}"
+                        >
+                          <span class="menu-icon">⧉</span>
+                          Per Tab Group
+                        </button>
+                        <button
+                          class="menu-item ${this.persistenceMode ===
+                          AIModePersisteceMode.PER_TAB
+                            ? 'active'
+                            : ''}"
+                          @click="${() =>
+                            this.handlePersistenceModeChange(
+                              AIModePersisteceMode.PER_TAB,
+                            )}"
+                        >
+                          <span class="menu-icon">⬜</span>
+                          Per Tab
+                        </button>
+                        <button
+                          class="menu-item ${this.persistenceMode ===
+                          AIModePersisteceMode.PER_WINDOW
+                            ? 'active'
+                            : ''}"
+                          @click="${() =>
+                            this.handlePersistenceModeChange(
+                              AIModePersisteceMode.PER_WINDOW,
+                            )}"
+                        >
+                          <span class="menu-icon">⬛</span>
+                          Per Window
+                        </button>
+                      </div>
+                      ${this.chats.length > 0
+                        ? html`
+                            <div class="menu-section">
+                              <div class="menu-section-title">Recent Chats</div>
+                              <div class="chat-list">
+                                ${this.chats.slice(0, 10).map(
+                                  (chat) => html`
+                                    <div
+                                      class="chat-item ${chat.id ===
+                                      this.currentChatId
+                                        ? 'active'
+                                        : ''}"
+                                    >
+                                      <button
+                                        class="chat-select"
+                                        @click="${() =>
+                                          this.handleSelectChat(chat.id)}"
+                                      >
+                                        <div class="chat-preview">
+                                          <div class="chat-query">
+                                            ${chat.query.slice(0, 50)}${chat
+                                              .query.length > 50
+                                              ? '...'
+                                              : ''}
+                                          </div>
+                                          <div class="chat-meta">
+                                            <span class="chat-date"
+                                              >${new Date(
+                                                chat.timestamp,
+                                              ).toLocaleDateString()}</span
+                                            >
+                                            ${chat.tabTitle
+                                              ? html`<span class="chat-tab"
+                                                  >${chat.tabTitle.slice(
+                                                    0,
+                                                    20,
+                                                  )}${chat.tabTitle.length > 20
+                                                    ? '...'
+                                                    : ''}</span
+                                                >`
+                                              : ''}
+                                          </div>
+                                        </div>
+                                      </button>
+                                      <button
+                                        class="chat-delete"
+                                        @click="${() =>
+                                          this.handleClearChat(chat.id)}"
+                                        title="Delete chat"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  `,
+                                )}
+                              </div>
+                            </div>
+                          `
+                        : ''}
+                    </div>
+                  `
+                : ''}
+            </div>
 
             <img
               src="../assets/ai-mode-logo.png"
@@ -149,7 +497,7 @@ ${pageContent.slice(0, 4000)}`
             ${!this.hasOpenAIKey
               ? html`
                   <div class="openai-warning">
-                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    <span class="warning-icon">⚠️</span>
                     OpenAI API key required for AI responses. Add key in
                     Extension Hub settings.
                   </div>
@@ -163,14 +511,14 @@ ${pageContent.slice(0, 4000)}`
                     ${this.isProcessing
                       ? html`
                           <div class="ai-loading">
-                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span class="loading-spinner">⟳</span>
                             Processing...
                           </div>
                         `
                       : html`
                           <div class="ai-response">
                             <div class="ai-response-header">
-                              <i class="fa-solid fa-robot"></i>
+                              <span class="ai-icon">🤖</span>
                               Mina's Response
                             </div>
                             <div class="ai-response-content">
@@ -178,6 +526,27 @@ ${pageContent.slice(0, 4000)}`
                             </div>
                           </div>
                         `}
+                  </div>
+                `
+              : ''}
+
+            <!-- QUERY SUGGESTIONS -->
+            ${this.querySuggestions.length > 0
+              ? html`
+                  <div class="query-suggestions">
+                    <div class="suggestions-header">This tab stuff:</div>
+                    <div class="suggestions-list">
+                      ${this.querySuggestions.map(
+                        (suggestion) => html`
+                          <button
+                            class="suggestion-button"
+                            @click="${() => (this.query = suggestion)}"
+                          >
+                            ${suggestion}
+                          </button>
+                        `,
+                      )}
+                    </div>
                   </div>
                 `
               : ''}
@@ -191,7 +560,15 @@ ${pageContent.slice(0, 4000)}`
             ></textarea>
 
             <div class="button-row">
-              <button class="primary-button">Submit</button>
+              <button
+                class="primary-button"
+                @click="${this.handleSubmit}"
+                ?disabled="${!this.hasOpenAIKey ||
+                this.isProcessing ||
+                !this.query.trim()}"
+              >
+                Submit
+              </button>
               ${this.showSummarizeButton
                 ? html`
                     <button
@@ -199,7 +576,7 @@ ${pageContent.slice(0, 4000)}`
                       @click="${this.handleSummarizePage}"
                       ?disabled="${!this.hasOpenAIKey || this.isProcessing}"
                     >
-                      <i class="fa-solid fa-file-lines"></i>
+                      <span class="summarize-icon">📄</span>
                       Summarize Page
                     </button>
                   `
@@ -410,6 +787,211 @@ ${pageContent.slice(0, 4000)}`
         font-size: 12px;
         line-height: 1.4;
         white-space: pre-wrap;
+      }
+
+      /* Query Suggestions */
+      .query-suggestions {
+        margin-bottom: 12px;
+        padding: 8px;
+        background-color: var(--color-background);
+        border-radius: 4px;
+        border: 1px solid var(--color-border-light);
+      }
+
+      .suggestions-header {
+        font-size: 11px;
+        font-weight: bold;
+        margin-bottom: 6px;
+        color: var(--color-text);
+        opacity: 0.8;
+      }
+
+      .suggestions-list {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .suggestion-button {
+        padding: 4px 8px;
+        font-size: 11px;
+        background-color: var(--color-button-clear-bg);
+        color: var(--color-button-clear-text);
+        border: 1px solid var(--color-border-light);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .suggestion-button:hover {
+        background-color: var(--color-button-clear-bg-hover);
+      }
+
+      /* Menu Dropdown */
+      .menu-container {
+        position: relative;
+      }
+
+      .menu-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background-color: var(--color-background);
+        border: 1px solid var(--color-border-light);
+        border-radius: 4px;
+        box-shadow: 0 4px 12px var(--color-shadow-dark);
+        min-width: 250px;
+        max-width: 300px;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 1000;
+        margin-top: 4px;
+      }
+
+      .menu-section {
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-border-light);
+      }
+
+      .menu-section:last-child {
+        border-bottom: none;
+      }
+
+      .menu-section-title {
+        font-size: 11px;
+        font-weight: bold;
+        padding: 4px 12px;
+        color: var(--color-text);
+        opacity: 0.8;
+        text-transform: uppercase;
+      }
+
+      .menu-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        width: 100%;
+        background: none;
+        border: none;
+        text-align: left;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .menu-item:hover {
+        background-color: var(--color-button-clear-bg-hover);
+      }
+
+      .menu-item.active {
+        background-color: var(--color-button-bg);
+        color: var(--color-button-text);
+      }
+
+      .menu-icon {
+        width: 14px;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      .loading-spinner {
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .ai-icon,
+      .warning-icon,
+      .summarize-icon {
+        margin-right: 4px;
+      }
+
+      /* Chat List */
+      .chat-list {
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .chat-item {
+        display: flex;
+        align-items: center;
+        padding: 4px 8px;
+        border-radius: 2px;
+        margin: 2px 4px;
+      }
+
+      .chat-item.active {
+        background-color: var(--color-button-bg);
+      }
+
+      .chat-select {
+        flex: 1;
+        background: none;
+        border: none;
+        text-align: left;
+        padding: 4px 8px;
+        cursor: pointer;
+        border-radius: 2px;
+        transition: background-color 0.2s ease;
+      }
+
+      .chat-select:hover {
+        background-color: var(--color-button-clear-bg-hover);
+      }
+
+      .chat-preview {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .chat-query {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-text);
+        line-height: 1.2;
+      }
+
+      .chat-meta {
+        display: flex;
+        gap: 8px;
+        font-size: 10px;
+        opacity: 0.7;
+      }
+
+      .chat-date {
+        color: var(--color-text);
+      }
+
+      .chat-tab {
+        color: var(--color-text);
+        font-style: italic;
+      }
+
+      .chat-delete {
+        padding: 4px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        opacity: 0.6;
+        border-radius: 2px;
+        transition: all 0.2s ease;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      .chat-delete:hover {
+        opacity: 1;
+        background-color: #ff6b6b;
+        color: white;
       }
     `
   }

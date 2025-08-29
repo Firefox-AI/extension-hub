@@ -62,7 +62,6 @@ export type MessageTypesT =
   | 'planner_followup'
   | 'aimode_search_action'
   | 'page_qa_endpoint'
- 
 
 export type PromptDataT = {
   prompt: string
@@ -98,6 +97,33 @@ export type PageContentT = {
   textContent: string
   siteName: string
   url?: string
+}
+
+export enum AIModePersisteceMode {
+  PER_TAB_GROUP = 'per_tab_group',
+  PER_TAB = 'per_tab',
+  PER_WINDOW = 'per_window',
+}
+
+export type AIModeChat = {
+  id: string
+  query: string
+  response: string
+  timestamp: number
+  tabId: number
+  groupId?: number
+  windowId: number
+  tabTitle?: string
+  tabUrl?: string
+}
+
+// Extend browser Tab type to include groupId
+declare global {
+  namespace browser.tabs {
+    interface Tab {
+      groupId: number
+    }
+  }
 }
 
 export type TabsT = Array<{
