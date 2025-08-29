@@ -2,11 +2,15 @@ import { LitElement, html, css } from 'lit'
 import { LocalStorageKeys } from '../../const'
 import { marked } from 'marked'
 import { pageRestrictionService } from '../services/pageRestriction'
+import { FeatureViewMixin } from './FeatureViewMixin'
+import { FeatureViewStyles } from './FeatureViewStyles'
 
-class MozQuestionAnswerEndpoint extends LitElement {
+class MozQuestionAnswerEndpoint extends FeatureViewMixin(LitElement) {
   prompt: string = ''
   loading: boolean = false
   response: string = ''
+  queryTimer: number = 0
+  intervalId: number = 0
   exampleQuestions = [
     'Can you define all the key words here?',
     'Can you summarize the content?',
@@ -16,147 +20,50 @@ class MozQuestionAnswerEndpoint extends LitElement {
     prompt: { type: String },
     loading: { type: Boolean },
     response: { type: String },
+    queryTimer: { type: Number },
   }
 
-  static styles = css`
-    :host {
-      --color-bg: #202020;
-      --color-link: #1e90ff;
-      --color-fg: #ffffff;
-      --color-border: #007bff;
-      --color-input-bg: #424242;
-      --color-secondary-hover: #585858;
-      --color-loader-bg: #424242;
-      --color-response-bg: #2d2c2c;
-      --color-gradient-start: #2e3133;
-      --color-gradient-end: #4b4e52;
-      --color-primary-disabled: #6d6d6d;
-    }
-
-    a {
-      color: var(--color-link);
-    }
-    .wrapper {
-      display: block;
-      padding: 10px;
-      color: var(--color-fg);
-      background-color: var(--color-bg);
-      /* override the sidebar’s default no‐select rules */
-      user-select: text !important;
-      -moz-user-select: text !important;
-    }
-
-    .container {
-      height: calc(100vh - 100px);
-      max-height: calc(100vh - 100px);
-      display: flex;
-      padding: 10px 14px;
-      background: linear-gradient(
-        135deg,
-        var(--color-gradient-start) 0%,
-        var(--color-gradient-end) 100%
-      );
-      flex-direction: column;
-      border-radius: 8px;
-      font-size: 14px;
-    }
-
-    .title {
-      font-size: 16px;
-      font-weight: 300;
-      margin-bottom: 0;
-    }
-
-    .text-input {
-      padding: 8px;
-      border: 1px solid var(--color-border);
-      border-radius: 4px;
-      margin-bottom: 10px;
-      background-color: var(--color-input-bg);
-      color: var(--color-fg);
-    }
-
-    .primary-button {
-      padding: 8px 12px;
-      background-color: var(--color-border);
-      color: var(--color-fg);
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-
-      &:disabled {
-        background-color: var(--color-primary-disabled);
-        cursor: not-allowed;
+  static styles = [
+    FeatureViewStyles,
+    css`
+      .wrapper {
+        display: block;
+        padding: 10px;
+        color: var(--color-fg);
+        background-color: var(--color-bg);
+        /* override the sidebar’s default no‐select rules */
+        user-select: text !important;
+        -moz-user-select: text !important;
       }
-    }
 
-    .secondary-button {
-      padding: 8px 12px;
-      color: var(--color-fg);
-      border: 1px solid var(--color-fg);
-      border-radius: 4px;
-      cursor: pointer;
-      background-color: transparent;
-    }
-
-    .secondary-button:hover {
-      background-color: var(--color-secondary-hover);
-    }
-
-    .example-buttons {
-      display: flex;
-      gap: 8px;
-      flex-direction: column;
-      margin-bottom: 20px;
-    }
-
-    .label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: bold;
-    }
-
-    @keyframes pulse {
-      0% {
-        background-color: var(--color-loader-bg);
+      .container {
+        height: calc(100vh - 100px);
+        max-height: calc(100vh - 100px);
+        display: flex;
+        padding: 10px 14px;
+        background: linear-gradient(
+          135deg,
+          var(--color-gradient-start) 0%,
+          var(--color-gradient-end) 100%
+        );
+        flex-direction: column;
+        border-radius: 8px;
+        font-size: 14px;
       }
-      50% {
-        background-color: var(--color-secondary-hover);
+
+      .response {
+        margin-bottom: 14px;
+        padding: 0 12px;
+        background-color: var(--color-response-bg);
+        border-radius: 4px;
+        color: var(--color-fg);
+        overflow-y: auto;
+        flex-grow: 1;
+        line-height: 1.5;
+        max-height: 100%;
       }
-      100% {
-        background-color: var(--color-loader-bg);
-      }
-    }
-
-    .loader {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 80px;
-      background-color: var(--color-loader-bg);
-      border-radius: 4px;
-      color: var(--color-fg);
-      animation: pulse 1.5s infinite;
-    }
-
-    .response {
-      margin-bottom: 10px;
-      padding: 0 12px;
-      background-color: var(--color-response-bg);
-      border-radius: 4px;
-      color: var(--color-fg);
-      overflow-y: auto;
-      flex-grow: 1;
-      line-height: 1.5;
-      max-height: 100%;
-    }
-
-    hr {
-      border: none;
-      border-top: 1px solid var(--color-secondary-hover);
-      margin: 20px 0;
-    }
-  `
+    `,
+  ]
 
   constructor() {
     super()
@@ -164,11 +71,16 @@ class MozQuestionAnswerEndpoint extends LitElement {
   }
 
   async initData() {
-    const storedData = await browser.storage.local.get(
-      LocalStorageKeys.LAST_QUESTION_ANSWER,
-    )
-    if (storedData.last_question_answer) {
-      this.response = storedData.last_question_answer
+    const { last_question_answer, last_question_answer_duration } =
+      await browser.storage.local.get([
+        LocalStorageKeys.LAST_QUESTION_ANSWER,
+        LocalStorageKeys.LAST_QUESTION_ANSWER_DURATION,
+      ])
+    if (last_question_answer) {
+      this.response = last_question_answer
+    }
+    if (last_question_answer_duration) {
+      this.queryTimer = last_question_answer_duration
     }
   }
 
@@ -191,7 +103,9 @@ class MozQuestionAnswerEndpoint extends LitElement {
       : 'No response received. Please try again.'
     browser.storage.local.set({
       [LocalStorageKeys.LAST_QUESTION_ANSWER]: this.response,
+      [LocalStorageKeys.LAST_QUESTION_ANSWER_DURATION]: this.queryTimer,
     })
+    this.setQueryTimer('stop')
   }
 
   handleInput(event: Event) {
@@ -223,6 +137,7 @@ class MozQuestionAnswerEndpoint extends LitElement {
       return
     }
     this.loading = true
+    this.setQueryTimer('start')
     this.handlePromptSubmit(this.prompt)
   }
 
@@ -247,16 +162,20 @@ class MozQuestionAnswerEndpoint extends LitElement {
               `,
             )}
           </div>
+
           ${this.loading
             ? html`<div class="loader">
-                <span>Getting your answer...</span>
+                <div>Getting your answer...</div>
+                <div>${this.millToSeconds(this.queryTimer)}s</div>
               </div>`
-            : ''}
-          ${!this.loading && this.response
-            ? html`<div class="response">
-                <p .innerHTML=${this.response}></p>
-              </div>`
-            : ''}
+            : this.response
+              ? html`<div class="response">
+                    <p .innerHTML=${this.response}></p>
+                  </div>
+                  <div>
+                    Query Duration: <b></b>${this.millToSeconds(this.queryTimer)}</b> seconds.
+                  </div>`
+              : ''}
 
           <hr />
           <input
