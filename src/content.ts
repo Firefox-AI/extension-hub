@@ -31,24 +31,6 @@ const onUserPrompt = (prompt: string) => {
   })
 }
 
-const onUserEndpointPrompt = (prompt: string) => {
-  const article = new Readability(document.cloneNode(true) as Document).parse()
-
-  // TODO make a better check for article validity
-  if (!article) return
-
-  const { textContent } = article
-  const payload = {
-    prompt,
-    textContent,
-  }
-
-  browser.runtime.sendMessage({
-    type: 'page_qa_endpoint',
-    data: payload,
-  })
-}
-
 const onPageSummarizePrompt = (prompt: string) => {
   const article = new Readability(document.cloneNode(true) as Document).parse()
   // TODO make a better check for article validity
@@ -84,9 +66,8 @@ const getPageContent = (): PageContentT | null => {
 
 // Handle messages from background script
 browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  console.log("HERE")
+  console.log('HERE')
   if (msg.type === 'user_prompt') onUserPrompt(msg.prompt)
-  if (msg.type === 'user_prompt_endpoint') onUserEndpointPrompt(msg.prompt)
   if (msg.type === 'page_summarize_prompt') onPageSummarizePrompt(msg.prompt)
   if (msg.type === 'get_page_content') {
     sendResponse(getPageContent())
