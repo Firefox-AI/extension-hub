@@ -105,10 +105,15 @@ export enum AIModePersisteceMode {
   PER_WINDOW = 'per_window',
 }
 
+export type AIModeMessage = {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+}
+
 export type AIModeChat = {
   id: string
-  query: string
-  response: string
+  messages: AIModeMessage[]
   timestamp: number
   tabId: number
   groupId?: number

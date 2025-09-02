@@ -4,7 +4,7 @@ import {
   OpenAIKeyManager,
 } from '../../services/openai'
 import { LocalStorageKeys } from '../../../const'
-import { AIModeChat, AIModePersisteceMode } from '../../../types'
+import { AIModeChat, AIModeMessage, AIModePersisteceMode } from '../../../types'
 
 class MozAIMode extends LitElement {
   query: string = ''
@@ -17,11 +17,12 @@ class MozAIMode extends LitElement {
   chats: AIModeChat[] = []
   currentChatId: string | null = null
   persistenceMode: AIModePersisteceMode = AIModePersisteceMode.PER_TAB_GROUP
-  querySuggestions: string[] = []
+  querySuggestions: Array<{ text: string; type: string }> = []
   showMenu: boolean = false
   currentTabId: number | null = null
   currentGroupId: number | null = null
   currentWindowId: number | null = null
+  selectedSuggestionIndex: number = -1
 
   static get properties() {
     return {
@@ -35,6 +36,7 @@ class MozAIMode extends LitElement {
       persistenceMode: { type: String },
       querySuggestions: { type: Array },
       showMenu: { type: Boolean },
+      selectedSuggestionIndex: { type: Number },
     }
   }
 
@@ -104,7 +106,10 @@ class MozAIMode extends LitElement {
         this.currentGroupId =
           activeTab.groupId !== -1 ? activeTab.groupId : null
 
-        this.generateQuerySuggestions(activeTab.title || '')
+        this.generateQuerySuggestions(
+          activeTab.title || '',
+          activeTab.url || '',
+        )
         this.loadRelevantChat()
       }
     } catch (error) {
@@ -112,9 +117,106 @@ class MozAIMode extends LitElement {
     }
   }
 
-  generateQuerySuggestions(tabTitle: string) {
-    const words = tabTitle.split(/\s+/).filter((word) => word.length > 2)
-    this.querySuggestions = words.slice(0, 3)
+  detectQueryType(query: string): string {
+    const trimmedQuery = query.trim().toLowerCase()
+
+    // Domain detection: single word with TLD
+    if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery)) {
+      return 'navigate'
+    }
+
+    // Chat detection: starts with question words
+    if (/^(who|what|when|where|why|how)\s/.test(trimmedQuery)) {
+      return 'chat'
+    }
+
+    // Action detection: starts with "tab"
+    if (trimmedQuery.startsWith('tab')) {
+      return 'action'
+    }
+
+    // Default to search
+    return 'search'
+  }
+
+  getQueryTypeIcon(type: string): string {
+    switch (type) {
+      case 'navigate':
+        return '🌐'
+      case 'chat':
+        return '💬'
+      case 'action':
+        return '⚡'
+      case 'search':
+        return '🔍'
+      default:
+        return '🔍'
+    }
+  }
+
+  getQueryTypeLabel(type: string): string {
+    switch (type) {
+      case 'navigate':
+        return 'Navigate'
+      case 'chat':
+        return 'Ask'
+      case 'action':
+        return 'Action'
+      case 'search':
+        return 'Search'
+      default:
+        return 'Search'
+    }
+  }
+
+  generateQuerySuggestions(tabTitle: string, currentDomain: string = '') {
+    const suggestions = []
+    const titleWords = tabTitle
+      .split(/\s+/)
+      .filter((word) => word.length > 3)
+      .slice(0, 3)
+
+    // 2 chat prompts
+    suggestions.push({
+      text: `What is ${titleWords[0] || 'this page'} about?`,
+      type: 'chat',
+    })
+    suggestions.push({
+      text: `How does ${titleWords[0] || 'this'} work?`,
+      type: 'chat',
+    })
+
+    // 2 web search queries based on title
+    if (titleWords.length > 0) {
+      suggestions.push({
+        text: `${titleWords.slice(0, 2).join(' ')} guide`,
+        type: 'search',
+      })
+      suggestions.push({
+        text: `best ${titleWords[0]} alternatives`,
+        type: 'search',
+      })
+    }
+
+    // 1 current tab domain
+    if (currentDomain) {
+      const domain = currentDomain
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .split('/')[0]
+      suggestions.push({
+        text: domain,
+        type: 'navigate',
+      })
+    }
+
+    // 1 action
+    suggestions.push({
+      text: 'tab next',
+      type: 'action',
+    })
+
+    this.querySuggestions = suggestions
     this.requestUpdate()
   }
 
@@ -151,8 +253,14 @@ class MozAIMode extends LitElement {
 
     if (relevantChat) {
       this.currentChatId = relevantChat.id
-      this.query = relevantChat.query
-      this.aiResponse = relevantChat.response
+      const lastUserMessage = relevantChat.messages
+        ?.filter((m) => m.role === 'user')
+        .pop()
+      const lastAssistantMessage = relevantChat.messages
+        ?.filter((m) => m.role === 'assistant')
+        .pop()
+      this.query = lastUserMessage?.content || ''
+      this.aiResponse = lastAssistantMessage?.content || ''
     } else {
       this.currentChatId = null
       this.query = ''
@@ -168,7 +276,12 @@ class MozAIMode extends LitElement {
 
   handleTabUpdated = async (tabId: number, changeInfo: any) => {
     if (tabId === this.currentTabId && changeInfo.title) {
-      this.generateQuerySuggestions(changeInfo.title)
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      })
+      const activeTab = tabs[0]
+      this.generateQuerySuggestions(changeInfo.title, activeTab?.url || '')
     }
   }
 
@@ -217,8 +330,71 @@ class MozAIMode extends LitElement {
     return responses[Math.floor(Math.random() * responses.length)]
   }
 
+  async handleNavigate(domain: string) {
+    try {
+      const url = domain.startsWith('http') ? domain : `https://${domain}`
+      await browser.tabs.create({ url })
+    } catch (error) {
+      console.error('Error navigating:', error)
+      this.aiResponse = `Sorry, couldn't navigate to ${domain}`
+    }
+  }
+
+  async handleAction(action: string) {
+    try {
+      if (
+        action.toLowerCase().includes('tab next') ||
+        action.toLowerCase().includes('tab')
+      ) {
+        const tabs = await browser.tabs.query({ currentWindow: true })
+        const currentIndex = tabs.findIndex(
+          (tab) => tab.id === this.currentTabId,
+        )
+        const nextIndex = (currentIndex + 1) % tabs.length
+        await browser.tabs.update(tabs[nextIndex].id!, { active: true })
+        this.aiResponse = `Switched to next tab: ${tabs[nextIndex].title || 'Untitled'}`
+      } else {
+        this.aiResponse = `Action "${action}" is not supported yet`
+      }
+    } catch (error) {
+      console.error('Error performing action:', error)
+      this.aiResponse = `Sorry, couldn't perform action: ${action}`
+    }
+  }
+
+  async handleSearch(query: string) {
+    try {
+      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+      await browser.tabs.create({ url: searchUrl })
+      this.aiResponse = `Opened Google search for: ${query}`
+    } catch (error) {
+      console.error('Error searching:', error)
+      this.aiResponse = `Sorry, couldn't search for: ${query}`
+    }
+  }
+
+  async handleChat(query: string) {
+    let response: string
+    if (this.hasOpenAIKey) {
+      try {
+        const openAIResponse = await getOpenAIChatResponseWithModel(
+          query,
+          'gpt-4o',
+        )
+        response = openAIResponse.content || this.generateDummyResponse(query)
+      } catch (error) {
+        console.error('OpenAI error, falling back to dummy response:', error)
+        response = this.generateDummyResponse(query)
+      }
+    } else {
+      response = this.generateDummyResponse(query)
+    }
+    return response
+  }
+
   async handleSubmit() {
-    if (!this.query.trim() || !this.currentTabId) return
+    const queryToSubmit = this.query
+    if (!queryToSubmit.trim() || !this.currentTabId) return
 
     this.isProcessing = true
     this.requestUpdate()
@@ -230,45 +406,83 @@ class MozAIMode extends LitElement {
       })
       const activeTab = tabs[0]
 
+      const detectedType = this.detectQueryType(queryToSubmit)
+
+      // Handle different query types
+      if (detectedType === 'navigate') {
+        await this.handleNavigate(queryToSubmit.trim())
+        this.isProcessing = false
+        this.requestUpdate()
+        return
+      } else if (detectedType === 'action') {
+        await this.handleAction(queryToSubmit)
+        this.isProcessing = false
+        this.requestUpdate()
+        return
+      } else if (
+        detectedType === 'search' &&
+        !this.aiResponse &&
+        !this.currentChatId
+      ) {
+        await this.handleSearch(queryToSubmit)
+        this.isProcessing = false
+        this.requestUpdate()
+        return
+      }
+
+      // Handle chat (including search queries when in chat context)
+      // For subsequent messages in existing chat, use canned responses only
       let response: string
-      if (this.hasOpenAIKey) {
-        try {
-          const openAIResponse = await getOpenAIChatResponseWithModel(
-            this.query,
-            'gpt-4o',
-          )
-          response =
-            openAIResponse.content || this.generateDummyResponse(this.query)
-        } catch (error) {
-          console.error('OpenAI error, falling back to dummy response:', error)
-          response = this.generateDummyResponse(this.query)
+      if (this.aiResponse || this.currentChatId) {
+        response = this.generateDummyResponse(queryToSubmit)
+      } else {
+        response = await this.handleChat(queryToSubmit)
+      }
+
+      const now = Date.now()
+      const userMessage: AIModeMessage = {
+        role: 'user',
+        content: queryToSubmit,
+        timestamp: now,
+      }
+      const assistantMessage: AIModeMessage = {
+        role: 'assistant',
+        content: response,
+        timestamp: now + 1,
+      }
+
+      if (this.currentChatId) {
+        // Append to existing chat
+        const existingChat = this.chats.find((c) => c.id === this.currentChatId)
+        if (existingChat) {
+          existingChat.messages.push(userMessage, assistantMessage)
+          existingChat.timestamp = now
         }
       } else {
-        response = this.generateDummyResponse(this.query)
+        // Create new chat
+        const newChat: AIModeChat = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          messages: [userMessage, assistantMessage],
+          timestamp: now,
+          tabId: this.currentTabId,
+          groupId: this.currentGroupId || undefined,
+          windowId: this.currentWindowId!,
+          tabTitle: activeTab?.title,
+          tabUrl: activeTab?.url,
+        }
+
+        this.chats.unshift(newChat)
+        this.currentChatId = newChat.id
       }
 
-      const newChat: AIModeChat = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        query: this.query,
-        response,
-        timestamp: Date.now(),
-        tabId: this.currentTabId,
-        groupId: this.currentGroupId || undefined,
-        windowId: this.currentWindowId!,
-        tabTitle: activeTab?.title,
-        tabUrl: activeTab?.url,
-      }
-
-      this.chats.unshift(newChat)
-      this.currentChatId = newChat.id
-      this.aiResponse = newChat.response
-
+      this.aiResponse = response
       await this.saveChats()
     } catch (error) {
       console.error('Error handling submit:', error)
       this.aiResponse = 'Sorry, I encountered an error processing your query.'
     }
 
+    this.query = ''
     this.isProcessing = false
     this.requestUpdate()
   }
@@ -335,11 +549,127 @@ ${pageContent.slice(0, 4000)}`
     this.requestUpdate()
   }
 
+  renderConversation() {
+    if (this.isProcessing && !this.aiResponse) {
+      return html`
+        <div class="ai-response-section">
+          <div class="ai-loading">
+            <span class="loading-spinner">⟳</span>
+            Processing...
+          </div>
+        </div>
+      `
+    }
+
+    if (!this.currentChatId || !this.aiResponse) {
+      return html``
+    }
+
+    const currentChat = this.chats.find((c) => c.id === this.currentChatId)
+    if (!currentChat) {
+      return html``
+    }
+
+    const messages: AIModeMessage[] = currentChat.messages || []
+
+    return html`
+      <div class="ai-response-section">
+        <div class="conversation">
+          ${messages.map(
+            (message) => html`
+              <div class="message ${message.role}">
+                <div class="message-header">
+                  <span class="message-icon">
+                    ${message.role === 'user' ? '👤' : '🤖'}
+                  </span>
+                  <span class="message-role">
+                    ${message.role === 'user' ? 'You' : 'Mina'}
+                  </span>
+                </div>
+                <div class="message-content">${message.content}</div>
+              </div>
+            `,
+          )}
+        </div>
+      </div>
+    `
+  }
+
+  handleKeyDown(e: KeyboardEvent) {
+    const suggestionsVisible =
+      this.querySuggestions.length > 0 &&
+      !this.aiResponse &&
+      !this.currentChatId
+
+    if (!suggestionsVisible) {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        this.handleSubmit()
+      }
+      return
+    }
+
+    switch (e.key) {
+      case 'Enter':
+        e.preventDefault()
+        this.handleSubmit()
+        break
+
+      case 'ArrowDown':
+        e.preventDefault()
+        this.selectedSuggestionIndex = Math.min(
+          this.selectedSuggestionIndex + 1,
+          this.querySuggestions.length - 1,
+        )
+        if (this.selectedSuggestionIndex >= 0) {
+          const suggestion = this.querySuggestions[this.selectedSuggestionIndex]
+          this.query = suggestion.text
+        }
+        this.requestUpdate()
+        break
+
+      case 'ArrowUp':
+        e.preventDefault()
+        this.selectedSuggestionIndex = Math.max(
+          this.selectedSuggestionIndex - 1,
+          -1,
+        )
+        if (this.selectedSuggestionIndex >= 0) {
+          const suggestion = this.querySuggestions[this.selectedSuggestionIndex]
+          this.query = suggestion.text
+        } else {
+          this.query = ''
+        }
+        this.requestUpdate()
+        break
+
+      case 'Escape':
+        this.selectedSuggestionIndex = -1
+        this.query = ''
+        this.requestUpdate()
+        break
+    }
+  }
+
+  handleSuggestionHover(index: number) {
+    this.selectedSuggestionIndex = index
+    const suggestion = this.querySuggestions[index]
+    this.query = suggestion.text
+    this.requestUpdate()
+  }
+
+  handleSuggestionClick(e: MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    this.handleSubmit()
+  }
+
   handleNewChatClick() {
     this.currentChatId = null
     this.query = ''
     this.aiResponse = ''
     this.showSummarizeButton = false
+    this.selectedSuggestionIndex = -1
     this.requestUpdate()
   }
 
@@ -370,8 +700,14 @@ ${pageContent.slice(0, 4000)}`
     const chat = this.chats.find((c) => c.id === chatId)
     if (chat) {
       this.currentChatId = chatId
-      this.query = chat.query
-      this.aiResponse = chat.response
+      const lastUserMessage = chat.messages
+        ?.filter((m) => m.role === 'user')
+        .pop()
+      const lastAssistantMessage = chat.messages
+        ?.filter((m) => m.role === 'assistant')
+        .pop()
+      this.query = lastUserMessage?.content || ''
+      this.aiResponse = lastAssistantMessage?.content || ''
       this.showMenu = false
       this.requestUpdate()
     }
@@ -462,10 +798,21 @@ ${pageContent.slice(0, 4000)}`
                                       >
                                         <div class="chat-preview">
                                           <div class="chat-query">
-                                            ${chat.query.slice(0, 50)}${chat
-                                              .query.length > 50
-                                              ? '...'
-                                              : ''}
+                                            ${(() => {
+                                              const lastUserMsg = chat.messages
+                                                ?.filter(
+                                                  (m) => m.role === 'user',
+                                                )
+                                                .pop()
+                                              const preview =
+                                                lastUserMsg?.content || ''
+                                              return (
+                                                preview.slice(0, 50) +
+                                                (preview.length > 50
+                                                  ? '...'
+                                                  : '')
+                                              )
+                                            })()}
                                           </div>
                                           <div class="chat-meta">
                                             <span class="chat-date"
@@ -539,44 +886,34 @@ ${pageContent.slice(0, 4000)}`
               : ''}
 
             <!-- AI RESPONSE SECTION -->
-            ${this.aiResponse || this.isProcessing
-              ? html`
-                  <div class="ai-response-section">
-                    ${this.isProcessing
-                      ? html`
-                          <div class="ai-loading">
-                            <span class="loading-spinner">⟳</span>
-                            Processing...
-                          </div>
-                        `
-                      : html`
-                          <div class="ai-response">
-                            <div class="ai-response-header">
-                              <span class="ai-icon">🤖</span>
-                              Mina's Response
-                            </div>
-                            <div class="ai-response-content">
-                              ${this.aiResponse}
-                            </div>
-                          </div>
-                        `}
-                  </div>
-                `
-              : ''}
+            ${this.renderConversation()}
 
             <!-- QUERY SUGGESTIONS -->
-            ${this.querySuggestions.length > 0
+            ${this.querySuggestions.length > 0 &&
+            !this.aiResponse &&
+            !this.currentChatId
               ? html`
                   <div class="query-suggestions">
-                    <div class="suggestions-header">This tab stuff:</div>
+                    <div class="suggestions-header">Suggest:</div>
                     <div class="suggestions-list">
                       ${this.querySuggestions.map(
-                        (suggestion) => html`
+                        (suggestion, index) => html`
                           <button
-                            class="suggestion-button"
-                            @click="${() => (this.query = suggestion)}"
+                            class="suggestion-button ${suggestion.type} ${this
+                              .selectedSuggestionIndex === index
+                              ? 'selected'
+                              : ''}"
+                            @click="${(e: MouseEvent) =>
+                              this.handleSuggestionClick(e)}"
+                            @mouseenter="${() =>
+                              this.handleSuggestionHover(index)}"
                           >
-                            ${suggestion}
+                            <span class="suggestion-icon"
+                              >${this.getQueryTypeIcon(suggestion.type)}</span
+                            >
+                            <span class="suggestion-text"
+                              >${suggestion.text}</span
+                            >
                           </button>
                         `,
                       )}
@@ -587,10 +924,15 @@ ${pageContent.slice(0, 4000)}`
 
             <textarea
               .value="${this.query}"
-              @input="${(e: Event) =>
-                (this.query = (e.target as HTMLTextAreaElement).value)}"
+              @input="${(e: Event) => {
+                this.query = (e.target as HTMLTextAreaElement).value
+                this.selectedSuggestionIndex = -1
+              }}"
+              @keydown="${this.handleKeyDown}"
               class="query-input"
-              placeholder="Type your query here..."
+              placeholder="${this.aiResponse || this.currentChatId
+                ? 'Continue the conversation…'
+                : 'Ask, search, or type a URL…'}"
             ></textarea>
 
             <div class="button-row">
@@ -599,7 +941,9 @@ ${pageContent.slice(0, 4000)}`
                 @click="${this.handleSubmit}"
                 ?disabled="${this.isProcessing || !this.query.trim()}"
               >
-                Submit
+                ${this.aiResponse || this.currentChatId
+                  ? '💬 Ask'
+                  : `${this.getQueryTypeIcon(this.detectQueryType(this.query))} ${this.getQueryTypeLabel(this.detectQueryType(this.query))}`}
               </button>
               ${this.showSummarizeButton
                 ? html`
@@ -825,6 +1169,64 @@ ${pageContent.slice(0, 4000)}`
         line-height: 1.4;
       }
 
+      /* Conversation Styles */
+      .conversation {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .message {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .message.user {
+        align-items: flex-end;
+      }
+
+      .message.assistant {
+        align-items: flex-start;
+      }
+
+      .message-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: bold;
+        opacity: 0.8;
+      }
+
+      .message-icon {
+        font-size: 14px;
+      }
+
+      .message-content {
+        background-color: var(--color-background);
+        border: 1px solid var(--color-border-light);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 12px;
+        line-height: 1.4;
+        max-width: 85%;
+        word-wrap: break-word;
+      }
+
+      .message.user .message-content {
+        background-color: var(--color-button-bg);
+        color: var(--color-button-text);
+        border-radius: 12px 4px 12px 12px;
+      }
+
+      .message.assistant .message-content {
+        background-color: var(--color-background);
+        border-radius: 4px 12px 12px 12px;
+      }
+
       /* Query Suggestions */
       .query-suggestions {
         margin-bottom: 12px;
@@ -844,23 +1246,57 @@ ${pageContent.slice(0, 4000)}`
 
       .suggestions-list {
         display: flex;
-        gap: 6px;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 4px;
       }
 
       .suggestion-button {
-        padding: 4px 8px;
-        font-size: 11px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        font-size: 12px;
         background-color: var(--color-button-clear-bg);
         color: var(--color-button-clear-text);
         border: 1px solid var(--color-border-light);
-        border-radius: 12px;
+        border-radius: 6px;
         cursor: pointer;
         transition: background-color 0.2s ease;
+        text-align: left;
+        width: 100%;
       }
 
-      .suggestion-button:hover {
+      .suggestion-button:hover,
+      .suggestion-button.selected {
         background-color: var(--color-button-clear-bg-hover);
+      }
+
+      .suggestion-icon {
+        font-size: 14px;
+        width: 16px;
+        text-align: center;
+        flex-shrink: 0;
+      }
+
+      .suggestion-text {
+        flex: 1;
+        font-size: 11px;
+      }
+
+      .suggestion-button.search {
+        border-left: 3px solid #4285f4;
+      }
+
+      .suggestion-button.chat {
+        border-left: 3px solid #34a853;
+      }
+
+      .suggestion-button.navigate {
+        border-left: 3px solid #ea4335;
+      }
+
+      .suggestion-button.action {
+        border-left: 3px solid #fbbc05;
       }
 
       /* Menu Dropdown */
