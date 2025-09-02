@@ -230,10 +230,27 @@ class MozAIMode extends LitElement {
       })
       const activeTab = tabs[0]
 
+      let response: string
+      if (this.hasOpenAIKey) {
+        try {
+          const openAIResponse = await getOpenAIChatResponseWithModel(
+            this.query,
+            'gpt-4o',
+          )
+          response =
+            openAIResponse.content || this.generateDummyResponse(this.query)
+        } catch (error) {
+          console.error('OpenAI error, falling back to dummy response:', error)
+          response = this.generateDummyResponse(this.query)
+        }
+      } else {
+        response = this.generateDummyResponse(this.query)
+      }
+
       const newChat: AIModeChat = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         query: this.query,
-        response: this.generateDummyResponse(this.query),
+        response,
         timestamp: Date.now(),
         tabId: this.currentTabId,
         groupId: this.currentGroupId || undefined,
@@ -315,6 +332,14 @@ ${pageContent.slice(0, 4000)}`
     }
 
     this.isProcessing = false
+    this.requestUpdate()
+  }
+
+  handleNewChatClick() {
+    this.currentChatId = null
+    this.query = ''
+    this.aiResponse = ''
+    this.showSummarizeButton = false
     this.requestUpdate()
   }
 
@@ -487,9 +512,18 @@ ${pageContent.slice(0, 4000)}`
               data-fa-i2svg="disabled"
               height="32"
             />
-            <button class="header-button" @click=${this.handleCloseClick}>
-              <slot name="expand-icon">Expand</slot>
-            </button>
+            <div class="header-buttons">
+              <button
+                class="header-button"
+                @click=${this.handleNewChatClick}
+                title="New Chat"
+              >
+                <slot name="new-chat-icon">+</slot>
+              </button>
+              <button class="header-button" @click=${this.handleCloseClick}>
+                <slot name="expand-icon">Expand</slot>
+              </button>
+            </div>
           </div>
 
           <div class="content">
@@ -498,8 +532,8 @@ ${pageContent.slice(0, 4000)}`
               ? html`
                   <div class="openai-warning">
                     <span class="warning-icon">⚠️</span>
-                    OpenAI API key required for AI responses. Add key in
-                    Extension Hub settings.
+                    OpenAI API key required for actual AI responses (dummy
+                    responses without). Add key in Extension Hub settings.
                   </div>
                 `
               : ''}
@@ -563,9 +597,7 @@ ${pageContent.slice(0, 4000)}`
               <button
                 class="primary-button"
                 @click="${this.handleSubmit}"
-                ?disabled="${!this.hasOpenAIKey ||
-                this.isProcessing ||
-                !this.query.trim()}"
+                ?disabled="${this.isProcessing || !this.query.trim()}"
               >
                 Submit
               </button>
@@ -657,6 +689,11 @@ ${pageContent.slice(0, 4000)}`
         background-color: var(--header-background);
         border-top-right-radius: 8px;
         border-top-left-radius: 8px;
+      }
+
+      .header-buttons {
+        display: flex;
+        gap: 4px;
       }
 
       .header-button {
@@ -786,7 +823,6 @@ ${pageContent.slice(0, 4000)}`
         padding: 12px;
         font-size: 12px;
         line-height: 1.4;
-        white-space: pre-wrap;
       }
 
       /* Query Suggestions */
