@@ -4,7 +4,12 @@ import {
   OpenAIKeyManager,
 } from '../../services/openai'
 import { LocalStorageKeys } from '../../../const'
-import { AIModeChat, AIModeMessage, AIModePersisteceMode } from '../../../types'
+import {
+  AIModeChat,
+  AIModeMessage,
+  AIModePersisteceMode,
+  mlBrowserT,
+} from '../../../types'
 
 class MozAIMode extends LitElement {
   query: string = ''
@@ -23,6 +28,7 @@ class MozAIMode extends LitElement {
   currentGroupId: number | null = null
   currentWindowId: number | null = null
   selectedSuggestionIndex: number = -1
+  userHasEditedQuery: boolean = false
 
   static get properties() {
     return {
@@ -37,6 +43,7 @@ class MozAIMode extends LitElement {
       querySuggestions: { type: Array },
       showMenu: { type: Boolean },
       selectedSuggestionIndex: { type: Number },
+      userHasEditedQuery: { type: Boolean },
     }
   }
 
@@ -130,8 +137,8 @@ class MozAIMode extends LitElement {
       return 'chat'
     }
 
-    // Action detection: starts with "tab"
-    if (trimmedQuery.startsWith('tab')) {
+    // Action detection: starts with "tab" or "find"
+    if (trimmedQuery.startsWith('tab') || trimmedQuery.startsWith('find')) {
       return 'action'
     }
 
@@ -176,26 +183,48 @@ class MozAIMode extends LitElement {
       .filter((word) => word.length > 3)
       .slice(0, 3)
 
-    // 2 chat prompts
-    suggestions.push({
-      text: `What is ${titleWords[0] || 'this page'} about?`,
-      type: 'chat',
-    })
-    suggestions.push({
-      text: `How does ${titleWords[0] || 'this'} work?`,
-      type: 'chat',
-    })
+    // 2 chat prompts (question format to match detectQueryType)
+    const chatPrompts = [
+      `What is ${titleWords[0] || 'this page'} about?`,
+      `How does ${titleWords[0] || 'this'} work?`,
+      `Why is ${titleWords[0] || 'this'} important?`,
+      `Where can I learn more about ${titleWords[0] || 'this'}?`,
+      `When should I use ${titleWords[0] || 'this'}?`,
+      `Who created ${titleWords[0] || 'this'}?`,
+      `What are the benefits of ${titleWords[0] || 'this'}?`,
+      `How do I get started with ${titleWords[0] || 'this'}?`,
+    ]
 
-    // 2 web search queries based on title
+    // Select 2 random chat prompts
+    const shuffledChats = [...chatPrompts].sort(() => Math.random() - 0.5)
+    suggestions.push(
+      { text: shuffledChats[0], type: 'chat' },
+      { text: shuffledChats[1], type: 'chat' },
+    )
+
+    // 2 web search queries (keyword format to match detectQueryType)
     if (titleWords.length > 0) {
-      suggestions.push({
-        text: `${titleWords.slice(0, 2).join(' ')} guide`,
-        type: 'search',
-      })
-      suggestions.push({
-        text: `best ${titleWords[0]} alternatives`,
-        type: 'search',
-      })
+      const searchQueries = [
+        `${titleWords.slice(0, 2).join(' ')} guide`,
+        `best ${titleWords[0]} alternatives`,
+        `${titleWords[0]} tutorial`,
+        `${titleWords[0]} tips tricks`,
+        `${titleWords.slice(0, 2).join(' ')} review`,
+        `${titleWords[0]} comparison`,
+        `${titleWords[0]} vs competitors`,
+        `${titleWords[0]} features`,
+        `${titleWords[0]} pricing`,
+        `${titleWords.slice(0, 2).join(' ')} documentation`,
+      ]
+
+      // Select 2 random search queries
+      const shuffledSearches = [...searchQueries].sort(
+        () => Math.random() - 0.5,
+      )
+      suggestions.push(
+        { text: shuffledSearches[0], type: 'search' },
+        { text: shuffledSearches[1], type: 'search' },
+      )
     }
 
     // 1 current tab domain
@@ -210,11 +239,17 @@ class MozAIMode extends LitElement {
       })
     }
 
-    // 1 action
+    // 2 actions
     suggestions.push({
       text: 'tab next',
       type: 'action',
     })
+    if (titleWords.length > 0) {
+      suggestions.push({
+        text: `find ${titleWords[0]}`,
+        type: 'action',
+      })
+    }
 
     this.querySuggestions = suggestions
     this.requestUpdate()
@@ -353,6 +388,14 @@ class MozAIMode extends LitElement {
         const nextIndex = (currentIndex + 1) % tabs.length
         await browser.tabs.update(tabs[nextIndex].id!, { active: true })
         this.aiResponse = `Switched to next tab: ${tabs[nextIndex].title || 'Untitled'}`
+      } else if (action.toLowerCase().startsWith('find ')) {
+        const query = action.slice(5).trim()
+        const found = await (
+          browser as unknown as mlBrowserT
+        ).extensionHub.findInPage(query)
+        this.aiResponse = found
+          ? `Found "${query}" in page`
+          : `"${query}" not found in page`
       } else {
         this.aiResponse = `Action "${action}" is not supported yet`
       }
@@ -416,6 +459,9 @@ class MozAIMode extends LitElement {
         return
       } else if (detectedType === 'action') {
         await this.handleAction(queryToSubmit)
+        this.query = ''
+        this.aiResponse = ''
+        this.userHasEditedQuery = false
         this.isProcessing = false
         this.requestUpdate()
         return
@@ -483,6 +529,7 @@ class MozAIMode extends LitElement {
     }
 
     this.query = ''
+    this.userHasEditedQuery = false
     this.isProcessing = false
     this.requestUpdate()
   }
@@ -639,6 +686,7 @@ ${pageContent.slice(0, 4000)}`
           this.query = suggestion.text
         } else {
           this.query = ''
+          this.userHasEditedQuery = false
         }
         this.requestUpdate()
         break
@@ -646,6 +694,7 @@ ${pageContent.slice(0, 4000)}`
       case 'Escape':
         this.selectedSuggestionIndex = -1
         this.query = ''
+        this.userHasEditedQuery = false
         this.requestUpdate()
         break
     }
@@ -653,9 +702,22 @@ ${pageContent.slice(0, 4000)}`
 
   handleSuggestionHover(index: number) {
     this.selectedSuggestionIndex = index
-    const suggestion = this.querySuggestions[index]
-    this.query = suggestion.text
+
+    // Only change query if user hasn't manually edited it
+    if (!this.userHasEditedQuery) {
+      const suggestion = this.querySuggestions[index]
+      this.query = suggestion.text
+    }
+
     this.requestUpdate()
+
+    // Focus the input box
+    const textarea = this.shadowRoot?.querySelector(
+      '.query-input',
+    ) as HTMLTextAreaElement
+    if (textarea) {
+      textarea.focus()
+    }
   }
 
   handleSuggestionClick(e: MouseEvent) {
@@ -670,6 +732,7 @@ ${pageContent.slice(0, 4000)}`
     this.aiResponse = ''
     this.showSummarizeButton = false
     this.selectedSuggestionIndex = -1
+    this.userHasEditedQuery = false
     this.requestUpdate()
   }
 
@@ -927,6 +990,12 @@ ${pageContent.slice(0, 4000)}`
               @input="${(e: Event) => {
                 this.query = (e.target as HTMLTextAreaElement).value
                 this.selectedSuggestionIndex = -1
+                // Reset userHasEditedQuery if query becomes empty
+                if (!this.query.trim()) {
+                  this.userHasEditedQuery = false
+                } else {
+                  this.userHasEditedQuery = true
+                }
               }}"
               @keydown="${this.handleKeyDown}"
               class="query-input"

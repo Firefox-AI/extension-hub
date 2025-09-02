@@ -72,6 +72,17 @@
           }
         ],
         "type": "function"
+      },
+      {
+        "async": true,
+        "name": "findInPage",
+        "parameters": [
+          {
+            "name": "query",
+            "type": "string"
+          }
+        ],
+        "type": "function"
       }
     ],
     "namespace": "extensionHub"

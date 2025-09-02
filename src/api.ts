@@ -245,6 +245,17 @@ export default class extends ExtensionAPI {
             return false
           }
         },
+
+        async findInPage(query: string): Promise<boolean> {
+          try {
+            const window = Services.wm.getMostRecentBrowserWindow()
+            const finder = window.gBrowser.selectedBrowser.finder
+            return finder.fastFind(query)
+          } catch (error) {
+            console.error('Failed to find in page:', error)
+            return false
+          }
+        },
       },
     }
   }
