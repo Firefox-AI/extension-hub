@@ -9,7 +9,6 @@ import MozPageSummarization from './features/page-summarization/MozPageSummariza
 import MozPlanChecklist from './features/MozPlanChecklist'
 import MozPlanner from './features/planner/MozPlanner'
 import MozQuestionAnswer from './features/MozQuestionAnswer'
-import MozQuestionAnswerEndpoint from './features/MozQuestionAnswerEndpoint'
 import MozSemanticSearch from './features/MozSemanticSearch'
 import MozTabs from './features/MozTabs'
 import MozTabsDebug from './features/MozTabsDebug'
@@ -31,4 +30,3 @@ customElements.define('moz-question-answer', MozQuestionAnswer)
 customElements.define('moz-semantic-search', MozSemanticSearch)
 customElements.define('moz-tabs-debug', MozTabsDebug)
 customElements.define('moz-tabs', MozTabs)
-customElements.define('moz-question-answer-endpoint', MozQuestionAnswerEndpoint)

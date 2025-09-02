@@ -12,7 +12,6 @@ import { summarizeTabs } from './services/browserHistory'
 import { getPlanResponse } from './services/plan-checklist'
 import { pageLauncher } from './services/pageLauncher'
 import { initEnvironment } from './systemConfig'
-import { getEndpointPageQandAResponse } from './services/remotePageQandA'
 
 // Message handler type definition
 type MessageHandler = (data: any) => Promise<void> | void
@@ -21,14 +20,6 @@ type MessageHandler = (data: any) => Promise<void> | void
 const messageHandlers: Partial<Record<MessageTypesT, MessageHandler>> = {
   page_qa: async (data) => {
     const result = await getPageQandAResponse(data.prompt, data.textContent)
-    browser.runtime.sendMessage({
-      type: 'page_qa_result',
-      result: result,
-    })
-  },
-
-  page_qa_endpoint: async (data) => {
-    const result = await getEndpointPageQandAResponse(data.prompt, data.textContent)
     browser.runtime.sendMessage({
       type: 'page_qa_result',
       result: result,
