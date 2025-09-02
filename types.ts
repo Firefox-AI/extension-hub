@@ -20,6 +20,7 @@ export type mlBrowserT = {
     domainTabs: (domain: string) => Promise<SemanticMatchT[]>
     askChat: (prompt: string) => Promise<void>
     getBoolPref: (prefName: string) => Promise<boolean>
+    findInPage: (query: string) => Promise<boolean>
   }
   trial?: {
     ml: {
