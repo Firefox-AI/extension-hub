@@ -10,6 +10,368 @@ import {
   AIModePersisteceMode,
   mlBrowserT,
 } from '../../../types'
+import { MlEngineService } from '../../services/mlEngine'
+
+// IAB Content Categories
+const TOPIC_CATEGORIES = {
+  travel: 'Travel & Tourism',
+  food: 'Food & Cooking',
+  technology: 'Technology & Computing',
+  sports: 'Sports & Recreation',
+  news: 'News & Current Events',
+  shopping: 'Shopping & E-commerce',
+  entertainment: 'Entertainment & Media',
+  health: 'Health & Fitness',
+  finance: 'Finance & Business',
+  education: 'Education & Learning',
+  general: 'General Interest',
+}
+
+type TopicClassificationResult = {
+  sequence: string
+  labels: string[]
+  scores: number[]
+}
+
+// Personal Insights Database
+const PERSONAL_INSIGHTS = {
+  // Topic-specific insights
+  topicInsights: {
+    travel: ['japan travel', 'budget travel', 'family travel', 'solo travel'],
+    food: ['vegan food', 'gluten-free', 'quick meals', 'healthy eating'],
+    technology: ['open source', 'mobile development', 'ai/ml', 'cybersecurity'],
+    sports: [
+      'nfl interest',
+      'fantasy sports',
+      'local teams',
+      'fitness tracking',
+    ],
+    news: [
+      'breaking news',
+      'political interest',
+      'local news',
+      'fact checking',
+    ],
+    shopping: [
+      'eco-friendly products',
+      'budget shopping',
+      'tech gadgets',
+      'home improvement',
+    ],
+    entertainment: [
+      'movie reviews',
+      'streaming content',
+      'music discovery',
+      'gaming',
+    ],
+    health: [
+      'mental health',
+      'nutrition focus',
+      'fitness goals',
+      'preventive care',
+    ],
+    finance: [
+      'retirement planning',
+      'crypto interest',
+      'budgeting',
+      'investing',
+    ],
+    education: [
+      'online learning',
+      'career development',
+      'skill building',
+      'certification',
+    ],
+    general: [
+      'trending topics',
+      'popular content',
+      'useful tips',
+      'interesting facts',
+    ],
+  },
+  // General insights
+  generalInsights: [
+    'family of 4',
+    'lives in reno',
+    'budget conscious',
+    'tech savvy',
+    'time-pressed',
+    'quality focused',
+    'environmentally conscious',
+    'health conscious',
+  ],
+}
+
+// Topic-specific suggestion templates
+const TOPIC_SUGGESTIONS = {
+  travel: {
+    chat: [
+      'What is the best time to visit {topic}?',
+      'How much does a trip to {topic} cost?',
+      'What are the top attractions in {topic}?',
+      'What are the local customs in {topic}?',
+      'Where should I stay in {topic}?',
+      'What food should I try in {topic}?',
+    ],
+    search: [
+      '{topic} travel guide',
+      '{topic} hotels deals',
+      '{topic} flight deals',
+      '{topic} travel tips',
+      'best {topic} restaurants',
+      '{topic} weather forecast',
+    ],
+  },
+  food: {
+    chat: [
+      'What are the ingredients in {topic}?',
+      'How do I make {topic} healthier?',
+      'What goes well with {topic}?',
+      'How long does {topic} last?',
+      'What are alternatives to {topic}?',
+      'How many calories are in {topic}?',
+    ],
+    search: [
+      '{topic} recipe',
+      '{topic} nutrition facts',
+      '{topic} cooking tips',
+      'healthy {topic} alternatives',
+      '{topic} meal prep',
+      '{topic} dietary restrictions',
+    ],
+  },
+  technology: {
+    chat: [
+      'How does {topic} work?',
+      'What are the pros and cons of {topic}?',
+      'Who should use {topic}?',
+      'What are alternatives to {topic}?',
+      'How secure is {topic}?',
+      'What skills do I need for {topic}?',
+    ],
+    search: [
+      '{topic} tutorial',
+      '{topic} vs competitors',
+      '{topic} reviews',
+      '{topic} documentation',
+      '{topic} pricing',
+      '{topic} best practices',
+    ],
+  },
+  sports: {
+    chat: [
+      'Who are the top {topic} players?',
+      'What are the latest {topic} news?',
+      'How can I improve at {topic}?',
+      'What equipment do I need for {topic}?',
+      'When is the {topic} season?',
+      'Where can I watch {topic}?',
+    ],
+    search: [
+      '{topic} scores',
+      '{topic} highlights',
+      '{topic} schedule',
+      '{topic} stats',
+      '{topic} training',
+      '{topic} gear',
+    ],
+  },
+  news: {
+    chat: [
+      'What happened with {topic}?',
+      'Why is {topic} important?',
+      'What are the implications of {topic}?',
+      'Who is involved in {topic}?',
+      'When did {topic} happen?',
+      'Where can I learn more about {topic}?',
+    ],
+    search: [
+      '{topic} latest news',
+      '{topic} analysis',
+      '{topic} fact check',
+      '{topic} timeline',
+      '{topic} expert opinion',
+      '{topic} background',
+    ],
+  },
+  shopping: {
+    chat: [
+      'What are the best deals for {topic}?',
+      'How much should I pay for {topic}?',
+      'Where can I buy {topic}?',
+      'What are the reviews for {topic}?',
+      'What are alternatives to {topic}?',
+      'What features should I look for in {topic}?',
+    ],
+    search: [
+      '{topic} best deals',
+      '{topic} price comparison',
+      '{topic} reviews',
+      '{topic} discount codes',
+      '{topic} where to buy',
+      '{topic} features',
+    ],
+  },
+  entertainment: {
+    chat: [
+      'What is {topic} about?',
+      'Who stars in {topic}?',
+      'When was {topic} released?',
+      'Where can I watch {topic}?',
+      'What genre is {topic}?',
+      'How long is {topic}?',
+    ],
+    search: [
+      '{topic} reviews',
+      '{topic} cast',
+      '{topic} streaming',
+      '{topic} trailer',
+      '{topic} ratings',
+      '{topic} similar shows',
+    ],
+  },
+  health: {
+    chat: [
+      'What are the symptoms of {topic}?',
+      'How can I prevent {topic}?',
+      'What causes {topic}?',
+      'When should I see a doctor about {topic}?',
+      'What treatments are available for {topic}?',
+      'How serious is {topic}?',
+    ],
+    search: [
+      '{topic} symptoms',
+      '{topic} treatment',
+      '{topic} prevention',
+      '{topic} causes',
+      '{topic} home remedies',
+      '{topic} medical advice',
+    ],
+  },
+  finance: {
+    chat: [
+      'How do I invest in {topic}?',
+      'What are the risks of {topic}?',
+      'When should I consider {topic}?',
+      'What are the fees for {topic}?',
+      'How does {topic} work?',
+      'What returns can I expect from {topic}?',
+    ],
+    search: [
+      '{topic} investment guide',
+      '{topic} fees',
+      '{topic} risks',
+      '{topic} returns',
+      '{topic} comparison',
+      '{topic} tax implications',
+    ],
+  },
+  education: {
+    chat: [
+      'How can I learn {topic}?',
+      'What skills do I need for {topic}?',
+      'Where can I study {topic}?',
+      'How long does it take to learn {topic}?',
+      'What career opportunities are in {topic}?',
+      'What are the prerequisites for {topic}?',
+    ],
+    search: [
+      '{topic} courses',
+      '{topic} certification',
+      '{topic} tutorials',
+      '{topic} career path',
+      '{topic} online learning',
+      '{topic} study guide',
+    ],
+  },
+  general: {
+    chat: [
+      'What is {topic} about?',
+      'How does {topic} work?',
+      'Why is {topic} important?',
+      'Where can I learn more about {topic}?',
+      'When should I use {topic}?',
+      'Who created {topic}?',
+    ],
+    search: [
+      '{topic} guide',
+      '{topic} tutorial',
+      '{topic} reviews',
+      '{topic} comparison',
+      '{topic} tips',
+      '{topic} alternatives',
+    ],
+  },
+}
+
+// Topic-specific domain suggestions
+const TOPIC_DOMAINS = {
+  travel: [
+    'booking.com',
+    'tripadvisor.com',
+    'airbnb.com',
+    'expedia.com',
+    'kayak.com',
+  ],
+  food: [
+    'allrecipes.com',
+    'foodnetwork.com',
+    'epicurious.com',
+    'tasty.co',
+    'delish.com',
+  ],
+  technology: [
+    'github.com',
+    'stackoverflow.com',
+    'techcrunch.com',
+    'arstechnica.com',
+    'wired.com',
+  ],
+  sports: [
+    'espn.com',
+    'bleacherreport.com',
+    'cbssports.com',
+    'nfl.com',
+    'nba.com',
+  ],
+  news: ['reuters.com', 'bbc.com', 'apnews.com', 'npr.org', 'cnn.com'],
+  shopping: ['amazon.com', 'ebay.com', 'walmart.com', 'target.com', 'etsy.com'],
+  entertainment: [
+    'imdb.com',
+    'netflix.com',
+    'rottentomatoes.com',
+    'hulu.com',
+    'spotify.com',
+  ],
+  health: [
+    'webmd.com',
+    'mayoclinic.org',
+    'healthline.com',
+    'medicalnewstoday.com',
+    'nih.gov',
+  ],
+  finance: [
+    'mint.com',
+    'investopedia.com',
+    'marketwatch.com',
+    'yahoo.finance.com',
+    'cnbc.com',
+  ],
+  education: [
+    'coursera.org',
+    'edx.org',
+    'khanacademy.org',
+    'udemy.com',
+    'codecademy.com',
+  ],
+  general: [
+    'wikipedia.org',
+    'reddit.com',
+    'quora.com',
+    'medium.com',
+    'youtube.com',
+  ],
+}
 
 class MozAIMode extends LitElement {
   query: string = ''
@@ -31,6 +393,10 @@ class MozAIMode extends LitElement {
   userHasEditedQuery: boolean = false
   hasMouseMoved: boolean = false
   private skipNextTabUpdate: boolean = false
+  currentTopic: string = 'general'
+  topicConfidence: number = 0
+  isClassifyingTopic: boolean = false
+  usePersonalInsights: boolean = false
 
   static get properties() {
     return {
@@ -47,11 +413,22 @@ class MozAIMode extends LitElement {
       selectedSuggestionIndex: { type: Number },
       userHasEditedQuery: { type: Boolean },
       hasMouseMoved: { type: Boolean },
+      currentTopic: { type: String },
+      topicConfidence: { type: Number },
+      isClassifyingTopic: { type: Boolean },
+      usePersonalInsights: { type: Boolean },
     }
   }
 
+  private mlEngineService: MlEngineService
+
   constructor() {
     super()
+    this.mlEngineService = new MlEngineService({
+      modelHub: 'huggingface',
+      modelId: 'Xenova/mobilebert-uncased-mnli',
+      taskName: 'zero-shot-classification',
+    })
   }
 
   async connectedCallback() {
@@ -63,6 +440,7 @@ class MozAIMode extends LitElement {
     this.initializeOpenAIKeyStatus()
     await this.loadChatsAndSettings()
     await this.updateCurrentTabInfo()
+    await this.loadPersonalInsightsPreference()
   }
 
   disconnectedCallback() {
@@ -128,9 +506,73 @@ class MozAIMode extends LitElement {
         }
 
         this.loadRelevantChat()
+        this.classifyTopicFromTab(activeTab.title || '', activeTab.url || '')
       }
     } catch (error) {
       console.error('Error getting current tab info:', error)
+    }
+  }
+
+  async loadPersonalInsightsPreference() {
+    try {
+      const { ai_mode_personal_insights } = await browser.storage.local.get([
+        'ai_mode_personal_insights',
+      ])
+      this.usePersonalInsights = ai_mode_personal_insights || false
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Error loading personal insights preference:', error)
+    }
+  }
+
+  async classifyTopicFromTab(tabTitle: string, tabUrl: string) {
+    if (!tabTitle.trim() && !tabUrl.trim()) return
+
+    try {
+      this.isClassifyingTopic = true
+      this.requestUpdate()
+
+      // Combine title and domain for classification
+      const domain = tabUrl
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .split('/')[0]
+      const content = `${tabTitle} ${domain}`.trim()
+
+      const labels = Object.values(TOPIC_CATEGORIES)
+      const classificationResult =
+        await this.mlEngineService.getAIResponse<TopicClassificationResult>({
+          args: [content.slice(0, 500), labels],
+        })
+
+      if (classificationResult && classificationResult.scores.length > 0) {
+        const bestLabel = classificationResult.labels[0]
+        const bestScore = classificationResult.scores[0]
+
+        const newTopic = Object.keys(TOPIC_CATEGORIES).find(
+          (key) =>
+            TOPIC_CATEGORIES[key as keyof typeof TOPIC_CATEGORIES] ===
+            bestLabel,
+        ) as keyof typeof TOPIC_CATEGORIES | undefined
+
+        if (newTopic && bestScore > 0.3) {
+          this.currentTopic = newTopic
+          this.topicConfidence = bestScore
+        } else {
+          this.currentTopic = 'general'
+          this.topicConfidence = 0
+        }
+
+        // Regenerate suggestions with new topic
+        this.generateQuerySuggestions(tabTitle, tabUrl)
+      }
+    } catch (error) {
+      console.error('Error classifying topic:', error)
+      this.currentTopic = 'general'
+      this.topicConfidence = 0
+    } finally {
+      this.isClassifyingTopic = false
+      this.requestUpdate()
     }
   }
 
@@ -193,52 +635,68 @@ class MozAIMode extends LitElement {
     const suggestions = []
     const titleWords = tabTitle
       .split(/\s+/)
-      .filter((word) => word.length > 3)
+      .filter((word) => word.length > 2)
       .slice(0, 3)
 
-    // 2 chat prompts (question format to match detectQueryType)
-    const chatPrompts = [
-      `What is ${titleWords[0] || 'this page'} about?`,
-      `How does ${titleWords[0] || 'this'} work?`,
-      `Why is ${titleWords[0] || 'this'} important?`,
-      `Where can I learn more about ${titleWords[0] || 'this'}?`,
-      `When should I use ${titleWords[0] || 'this'}?`,
-      `Who created ${titleWords[0] || 'this'}?`,
-      `What are the benefits of ${titleWords[0] || 'this'}?`,
-      `How do I get started with ${titleWords[0] || 'this'}?`,
-    ]
+    const topicKey = this.currentTopic as keyof typeof TOPIC_SUGGESTIONS
+    const topicTemplates =
+      TOPIC_SUGGESTIONS[topicKey] || TOPIC_SUGGESTIONS.general
+    const topic = titleWords.join(' ') || 'this'
 
-    // Select 2 random chat prompts
-    const shuffledChats = [...chatPrompts].sort(() => Math.random() - 0.5)
+    const getPersonalizedContext = () => {
+      if (!this.usePersonalInsights) return ''
+
+      const topicInsights = PERSONAL_INSIGHTS.topicInsights[topicKey] || []
+      const generalInsights = PERSONAL_INSIGHTS.generalInsights
+
+      let context = ''
+      // Select random insights for each suggestion
+      const selectedTopicInsight =
+        topicInsights[Math.floor(Math.random() * topicInsights.length)]
+      const selectedGeneralInsight =
+        generalInsights[Math.floor(Math.random() * generalInsights.length)]
+
+      if (selectedTopicInsight) context += ` ${selectedTopicInsight}`
+      if (selectedGeneralInsight) context += ` ${selectedGeneralInsight}`
+
+      return context
+    }
+
+    // 2 chat prompts using topic-aware templates with individual personalization
+    const chatTemplates = [...topicTemplates.chat].sort(
+      () => Math.random() - 0.5,
+    )
     suggestions.push(
-      { text: shuffledChats[0], type: 'chat' },
-      { text: shuffledChats[1], type: 'chat' },
+      {
+        text:
+          chatTemplates[0].replace('{topic}', topic) + getPersonalizedContext(),
+        type: 'chat',
+      },
+      {
+        text:
+          chatTemplates[1].replace('{topic}', topic) + getPersonalizedContext(),
+        type: 'chat',
+      },
     )
 
-    // 2 web search queries (keyword format to match detectQueryType)
-    if (titleWords.length > 0) {
-      const searchQueries = [
-        `${titleWords.slice(0, 2).join(' ')} guide`,
-        `best ${titleWords[0]} alternatives`,
-        `${titleWords[0]} tutorial`,
-        `${titleWords[0]} tips tricks`,
-        `${titleWords.slice(0, 2).join(' ')} review`,
-        `${titleWords[0]} comparison`,
-        `${titleWords[0]} vs competitors`,
-        `${titleWords[0]} features`,
-        `${titleWords[0]} pricing`,
-        `${titleWords.slice(0, 2).join(' ')} documentation`,
-      ]
-
-      // Select 2 random search queries
-      const shuffledSearches = [...searchQueries].sort(
-        () => Math.random() - 0.5,
-      )
-      suggestions.push(
-        { text: shuffledSearches[0], type: 'search' },
-        { text: shuffledSearches[1], type: 'search' },
-      )
-    }
+    // 2 search queries using topic-aware templates with individual personalization
+    const searchTemplates = [...topicTemplates.search].sort(
+      () => Math.random() - 0.5,
+    )
+    suggestions.push(
+      {
+        text:
+          searchTemplates[0].replace('{topic}', topic) +
+          getPersonalizedContext(),
+        type: 'search',
+      },
+      {
+        text:
+          searchTemplates[1].replace('{topic}', topic) +
+          getPersonalizedContext(),
+        type: 'search',
+      },
+    )
 
     // 1 current tab domain
     if (currentDomain) {
@@ -248,6 +706,30 @@ class MozAIMode extends LitElement {
         .split('/')[0]
       suggestions.push({
         text: domain,
+        type: 'navigate',
+      })
+    }
+
+    // 1 topic-specific domain suggestion (different from current)
+    const topicDomains = TOPIC_DOMAINS[topicKey] || TOPIC_DOMAINS.general
+    const currentTabDomain = currentDomain
+      ? currentDomain
+          .replace(/^https?:\/\//, '')
+          .replace(/^www\./, '')
+          .split('/')[0]
+          .toLowerCase()
+      : ''
+
+    // Filter out the current domain and select a random one
+    const availableDomains = topicDomains.filter(
+      (domain) => domain.toLowerCase() !== currentTabDomain,
+    )
+
+    if (availableDomains.length > 0) {
+      const suggestedDomain =
+        availableDomains[Math.floor(Math.random() * availableDomains.length)]
+      suggestions.push({
+        text: suggestedDomain,
         type: 'navigate',
       })
     }
@@ -820,6 +1302,48 @@ ${pageContent.slice(0, 4000)}`
     this.requestUpdate()
   }
 
+  async handlePersonalInsightsToggle() {
+    this.usePersonalInsights = !this.usePersonalInsights
+
+    // Save preference
+    try {
+      await browser.storage.local.set({
+        ai_mode_personal_insights: this.usePersonalInsights,
+      })
+    } catch (error) {
+      console.error('Error saving personal insights preference:', error)
+    }
+
+    // Regenerate suggestions with new setting
+    const tabs = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    })
+    const activeTab = tabs[0]
+    if (activeTab) {
+      this.generateQuerySuggestions(activeTab.title || '', activeTab.url || '')
+    }
+
+    this.requestUpdate()
+  }
+
+  getTopicIcon(topic: string): string {
+    const icons: { [key: string]: string } = {
+      travel: '✈️',
+      food: '🍕',
+      technology: '💻',
+      sports: '⚽',
+      news: '📰',
+      shopping: '🛒',
+      entertainment: '🎬',
+      health: '🏥',
+      finance: '💰',
+      education: '📚',
+      general: '📄',
+    }
+    return icons[topic] || icons.general
+  }
+
   render() {
     return html`
       <div class="wrapper">
@@ -998,7 +1522,40 @@ ${pageContent.slice(0, 4000)}`
                       ? 'mouse-moved'
                       : ''}"
                   >
-                    <div class="suggestions-header">Suggest:</div>
+                    <div class="suggestions-header">
+                      <div class="suggestions-header-left">
+                        <span>Suggest:</span>
+                        ${this.currentTopic !== 'general' &&
+                        this.topicConfidence > 0
+                          ? html`
+                              <span class="topic-badge">
+                                ${this.getTopicIcon(this.currentTopic)}
+                                ${TOPIC_CATEGORIES[
+                                  this
+                                    .currentTopic as keyof typeof TOPIC_CATEGORIES
+                                ]}
+                                ${this.isClassifyingTopic
+                                  ? html`<span class="classifying">...</span>`
+                                  : ''}
+                              </span>
+                            `
+                          : this.isClassifyingTopic
+                            ? html`<span class="classifying"
+                                >Analyzing topic...</span
+                              >`
+                            : ''}
+                      </div>
+                      <div class="personalization-toggle">
+                        <label class="toggle-label">
+                          <input
+                            type="checkbox"
+                            ?checked="${this.usePersonalInsights}"
+                            @change="${this.handlePersonalInsightsToggle}"
+                          />
+                          <span class="toggle-text">Personalize</span>
+                        </label>
+                      </div>
+                    </div>
                     <div class="suggestions-list">
                       ${this.querySuggestions.map(
                         (suggestion, index) => html`
@@ -1351,11 +1908,59 @@ ${pageContent.slice(0, 4000)}`
       }
 
       .suggestions-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         font-size: 11px;
         font-weight: bold;
         margin-bottom: 6px;
         color: var(--color-text);
         opacity: 0.8;
+      }
+
+      .suggestions-header-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .topic-badge {
+        background-color: var(--color-button-bg);
+        color: var(--color-button-text);
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: normal;
+      }
+
+      .classifying {
+        font-style: italic;
+        opacity: 0.7;
+      }
+
+      .personalization-toggle {
+        display: flex;
+        align-items: center;
+      }
+
+      .toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        font-size: 10px;
+        font-weight: normal;
+        opacity: 0.9;
+      }
+
+      .toggle-label input[type='checkbox'] {
+        width: 12px;
+        height: 12px;
+        cursor: pointer;
+      }
+
+      .toggle-text {
+        user-select: none;
       }
 
       .suggestions-list {
