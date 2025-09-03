@@ -29,6 +29,8 @@ class MozAIMode extends LitElement {
   currentWindowId: number | null = null
   selectedSuggestionIndex: number = -1
   userHasEditedQuery: boolean = false
+  hasMouseMoved: boolean = false
+  private skipNextTabUpdate: boolean = false
 
   static get properties() {
     return {
@@ -44,6 +46,7 @@ class MozAIMode extends LitElement {
       showMenu: { type: Boolean },
       selectedSuggestionIndex: { type: Number },
       userHasEditedQuery: { type: Boolean },
+      hasMouseMoved: { type: Boolean },
     }
   }
 
@@ -113,10 +116,17 @@ class MozAIMode extends LitElement {
         this.currentGroupId =
           activeTab.groupId !== -1 ? activeTab.groupId : null
 
-        this.generateQuerySuggestions(
-          activeTab.title || '',
-          activeTab.url || '',
-        )
+        // Skip suggestions and classification if we just opened a new tab
+        if (this.skipNextTabUpdate) {
+          this.skipNextTabUpdate = false
+        } else {
+          this.generateQuerySuggestions(
+            activeTab.title || '',
+            activeTab.url || '',
+          )
+          this.classifyTopicFromTab(activeTab.title || '', activeTab.url || '')
+        }
+
         this.loadRelevantChat()
       }
     } catch (error) {
@@ -127,8 +137,11 @@ class MozAIMode extends LitElement {
   detectQueryType(query: string): string {
     const trimmedQuery = query.trim().toLowerCase()
 
-    // Domain detection: single word with TLD
-    if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery)) {
+    // Domain detection: no spaces with at least one period (supports subdomains)
+    if (
+      /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery) &&
+      !trimmedQuery.includes(' ')
+    ) {
       return 'navigate'
     }
 
@@ -252,6 +265,7 @@ class MozAIMode extends LitElement {
     }
 
     this.querySuggestions = suggestions
+    this.hasMouseMoved = false
     this.requestUpdate()
   }
 
@@ -368,6 +382,7 @@ class MozAIMode extends LitElement {
   async handleNavigate(domain: string) {
     try {
       const url = domain.startsWith('http') ? domain : `https://${domain}`
+      this.skipNextTabUpdate = true
       await browser.tabs.create({ url })
     } catch (error) {
       console.error('Error navigating:', error)
@@ -408,8 +423,11 @@ class MozAIMode extends LitElement {
   async handleSearch(query: string) {
     try {
       const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+      this.skipNextTabUpdate = true
       await browser.tabs.create({ url: searchUrl })
       this.aiResponse = `Opened Google search for: ${query}`
+      this.query = '' // Clear the input box
+      this.userHasEditedQuery = false
     } catch (error) {
       console.error('Error searching:', error)
       this.aiResponse = `Sorry, couldn't search for: ${query}`
@@ -700,6 +718,21 @@ ${pageContent.slice(0, 4000)}`
     }
   }
 
+  handleContentMouseMove = () => {
+    if (!this.hasMouseMoved) {
+      this.hasMouseMoved = true
+      this.requestUpdate()
+    }
+  }
+
+  handleContentMouseLeave = () => {
+    if (!this.userHasEditedQuery && this.selectedSuggestionIndex >= 0) {
+      this.query = ''
+      this.selectedSuggestionIndex = -1
+      this.requestUpdate()
+    }
+  }
+
   handleSuggestionHover(index: number) {
     this.selectedSuggestionIndex = index
 
@@ -936,7 +969,11 @@ ${pageContent.slice(0, 4000)}`
             </div>
           </div>
 
-          <div class="content">
+          <div
+            class="content"
+            @mousemove="${this.handleContentMouseMove}"
+            @mouseleave="${this.handleContentMouseLeave}"
+          >
             <!-- OPENAI KEY WARNING -->
             ${!this.hasOpenAIKey
               ? html`
@@ -956,7 +993,11 @@ ${pageContent.slice(0, 4000)}`
             !this.aiResponse &&
             !this.currentChatId
               ? html`
-                  <div class="query-suggestions">
+                  <div
+                    class="query-suggestions ${this.hasMouseMoved
+                      ? 'mouse-moved'
+                      : ''}"
+                  >
                     <div class="suggestions-header">Suggest:</div>
                     <div class="suggestions-list">
                       ${this.querySuggestions.map(
@@ -1303,6 +1344,10 @@ ${pageContent.slice(0, 4000)}`
         background-color: var(--color-background);
         border-radius: 4px;
         border: 1px solid var(--color-border-light);
+      }
+
+      .query-suggestions:not(.mouse-moved) {
+        pointer-events: none;
       }
 
       .suggestions-header {
