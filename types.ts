@@ -36,7 +36,7 @@ export type mlBrowserT = {
     query: (options: {
       currentWindow: boolean
     }) => Promise<Array<{ id?: number; url?: string }>>
-    group: (options: { tabIds: number[] }) => Promise<number>
+    group: (options: { tabIds: number[]; groupId?: number }) => Promise<number>
   }
   tabGroups: {
     update: (

@@ -12,6 +12,10 @@ import {
 } from '../../../types'
 import { MlEngineService } from '../../services/mlEngine'
 
+// Default favicon for tabs
+const DEFAULT_FAVICON =
+  'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23666" d="M12 2L2 7v10c0 5.55 3.84 10 9 10s9-4.45 9-10V7L12 2z"/></svg>'
+
 // IAB Content Categories
 const TOPIC_CATEGORIES = {
   travel: 'Travel & Tourism',
@@ -397,6 +401,14 @@ class MozAIMode extends LitElement {
   topicConfidence: number = 0
   isClassifyingTopic: boolean = false
   usePersonalInsights: boolean = false
+  showTabsMenu: boolean = false
+  selectedTabs: Array<{ id: number; title: string; favicon: string }> = []
+  availableTabs: Array<{
+    id: number
+    title: string
+    url: string
+    favicon: string
+  }> = []
 
   static get properties() {
     return {
@@ -417,6 +429,9 @@ class MozAIMode extends LitElement {
       topicConfidence: { type: Number },
       isClassifyingTopic: { type: Boolean },
       usePersonalInsights: { type: Boolean },
+      showTabsMenu: { type: Boolean },
+      selectedTabs: { type: Array },
+      availableTabs: { type: Array },
     }
   }
 
@@ -441,6 +456,7 @@ class MozAIMode extends LitElement {
     await this.loadChatsAndSettings()
     await this.updateCurrentTabInfo()
     await this.loadPersonalInsightsPreference()
+    await this.initializeCurrentTabInSelectedList()
   }
 
   disconnectedCallback() {
@@ -522,6 +538,74 @@ class MozAIMode extends LitElement {
       this.requestUpdate()
     } catch (error) {
       console.error('Error loading personal insights preference:', error)
+    }
+  }
+
+  async loadAvailableTabs() {
+    try {
+      const tabs = await browser.tabs.query({ currentWindow: true })
+      this.availableTabs = tabs
+        .filter(
+          (tab) =>
+            !this.selectedTabs.some((selected) => selected.id === tab.id),
+        )
+        .map((tab) => ({
+          id: tab.id!,
+          title: tab.title || 'Untitled',
+          url: tab.url || '',
+          favicon: tab.favIconUrl || DEFAULT_FAVICON,
+        }))
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Error loading available tabs:', error)
+    }
+  }
+
+  async addTabToGroup(tabId: number) {
+    try {
+      if (this.currentGroupId && this.currentGroupId !== -1) {
+        // Add to existing group
+        await (browser as unknown as mlBrowserT).tabs.group({
+          tabIds: [tabId],
+          groupId: this.currentGroupId,
+        })
+      } else if (this.currentTabId) {
+        // Create new group with current tab and new tab
+        const groupId = await (browser as unknown as mlBrowserT).tabs.group({
+          tabIds: [this.currentTabId, tabId],
+        })
+        this.currentGroupId = groupId
+      }
+    } catch (error) {
+      console.error('Error managing tab group:', error)
+    }
+  }
+
+  async initializeCurrentTabInSelectedList() {
+    try {
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      })
+      const activeTab = tabs[0]
+
+      if (activeTab && activeTab.id) {
+        const currentTabData = {
+          id: activeTab.id,
+          title: activeTab.title || 'Untitled',
+          favicon: activeTab.favIconUrl || DEFAULT_FAVICON,
+        }
+
+        // Initialize with only the current tab as the initial context
+        if (!this.selectedTabs.some((tab) => tab.id === activeTab.id)) {
+          this.selectedTabs = [currentTabData] // Replace, don't append
+        }
+
+        // Load other available tabs (excluding the current one)
+        await this.loadAvailableTabs()
+      }
+    } catch (error) {
+      console.error('Error initializing current tab context:', error)
     }
   }
 
@@ -803,6 +887,59 @@ class MozAIMode extends LitElement {
 
   handleTabChanged = async (activeInfo: any) => {
     await this.updateCurrentTabInfo()
+
+    // Update selected tabs to reflect the new current tab context
+    const newActiveTabId = activeInfo.tabId
+    const tabIndex = this.selectedTabs.findIndex(
+      (tab) => tab.id === newActiveTabId,
+    )
+
+    if (tabIndex > 0) {
+      // Move the newly active tab to the front of the selected tabs list
+      const activeTab = this.selectedTabs[tabIndex]
+      this.selectedTabs.splice(tabIndex, 1)
+      this.selectedTabs.unshift(activeTab)
+      this.requestUpdate()
+    } else if (tabIndex === -1) {
+      // If no active chat, replace the current tab context with the new active tab
+      // If there is an active chat, keep existing context and just move to front
+      try {
+        const tab = await browser.tabs.get(newActiveTabId)
+        if (tab) {
+          const newTabData = {
+            id: tab.id!,
+            title: tab.title || 'Untitled',
+            favicon: tab.favIconUrl || DEFAULT_FAVICON,
+          }
+
+          if (!this.currentChatId && !this.aiResponse) {
+            // No active chat - replace the current tab context
+            // Add the old current tab back to available tabs
+            if (this.selectedTabs.length > 0) {
+              const oldCurrentTab = this.selectedTabs[0]
+              this.availableTabs.push({
+                id: oldCurrentTab.id,
+                title: oldCurrentTab.title,
+                url: '', // We don't have URL stored in selectedTabs
+                favicon: oldCurrentTab.favicon,
+              })
+            }
+            this.selectedTabs = [newTabData]
+          } else {
+            // Active chat exists - add new tab to context
+            this.selectedTabs.unshift(newTabData)
+          }
+
+          // Remove from available tabs if it was there
+          this.availableTabs = this.availableTabs.filter(
+            (t) => t.id !== newActiveTabId,
+          )
+          this.requestUpdate()
+        }
+      } catch (error) {
+        console.error('Error updating current tab context:', error)
+      }
+    }
   }
 
   handleTabUpdated = async (tabId: number, changeInfo: any) => {
@@ -865,7 +1002,12 @@ class MozAIMode extends LitElement {
     try {
       const url = domain.startsWith('http') ? domain : `https://${domain}`
       this.skipNextTabUpdate = true
-      await browser.tabs.create({ url })
+      const newTab = await browser.tabs.create({ url })
+
+      // Add the new tab to current group if group exists, or create new group
+      if (newTab.id) {
+        await this.addTabToGroup(newTab.id)
+      }
     } catch (error) {
       console.error('Error navigating:', error)
       this.aiResponse = `Sorry, couldn't navigate to ${domain}`
@@ -884,15 +1026,11 @@ class MozAIMode extends LitElement {
         )
         const nextIndex = (currentIndex + 1) % tabs.length
         await browser.tabs.update(tabs[nextIndex].id!, { active: true })
-        this.aiResponse = `Switched to next tab: ${tabs[nextIndex].title || 'Untitled'}`
       } else if (action.toLowerCase().startsWith('find ')) {
         const query = action.slice(5).trim()
         const found = await (
           browser as unknown as mlBrowserT
         ).extensionHub.findInPage(query)
-        this.aiResponse = found
-          ? `Found "${query}" in page`
-          : `"${query}" not found in page`
       } else {
         this.aiResponse = `Action "${action}" is not supported yet`
       }
@@ -906,8 +1044,13 @@ class MozAIMode extends LitElement {
     try {
       const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`
       this.skipNextTabUpdate = true
-      await browser.tabs.create({ url: searchUrl })
-      this.aiResponse = `Opened Google search for: ${query}`
+      const newTab = await browser.tabs.create({ url: searchUrl })
+
+      // Add the new tab to current group if group exists, or create new group
+      if (newTab.id) {
+        await this.addTabToGroup(newTab.id)
+      }
+
       this.query = '' // Clear the input box
       this.userHasEditedQuery = false
     } catch (error) {
@@ -1327,6 +1470,83 @@ ${pageContent.slice(0, 4000)}`
     this.requestUpdate()
   }
 
+  handleAddTabClick() {
+    this.showTabsMenu = !this.showTabsMenu
+    if (this.showTabsMenu) {
+      this.loadAvailableTabs()
+    }
+    this.requestUpdate()
+  }
+
+  async handleTabSelect(tab: {
+    id: number
+    title: string
+    url: string
+    favicon: string
+  }) {
+    // Add tab to selected list
+    this.selectedTabs.push({
+      id: tab.id,
+      title: tab.title,
+      favicon: tab.favicon,
+    })
+
+    // Remove from available tabs
+    this.availableTabs = this.availableTabs.filter((t) => t.id !== tab.id)
+
+    // Add to current tab group if group exists, or create new group
+    await this.addTabToGroup(tab.id)
+
+    // Close the menu
+    this.showTabsMenu = false
+    this.requestUpdate()
+  }
+
+  async handleRemoveTab(tabId: number) {
+    // Find the tab being removed
+    const removedTab = this.selectedTabs.find((tab) => tab.id === tabId)
+    if (!removedTab) return
+
+    // Remove from selected tabs
+    this.selectedTabs = this.selectedTabs.filter((tab) => tab.id !== tabId)
+
+    // Add back to available tabs if it's still open
+    try {
+      const tab = await browser.tabs.get(tabId)
+      if (tab) {
+        this.availableTabs.push({
+          id: tab.id!,
+          title: tab.title || 'Untitled',
+          url: tab.url || '',
+          favicon: tab.favIconUrl || DEFAULT_FAVICON,
+        })
+      }
+    } catch (error) {
+      // Tab was likely closed, so don't add back to available tabs
+    }
+
+    this.requestUpdate()
+  }
+
+  async handleSelectedTabClick(tabId: number) {
+    try {
+      await browser.tabs.update(tabId, { active: true })
+
+      // Move the clicked tab to the front of the selected tabs list (context)
+      const clickedTabIndex = this.selectedTabs.findIndex(
+        (tab) => tab.id === tabId,
+      )
+      if (clickedTabIndex > 0) {
+        const clickedTab = this.selectedTabs[clickedTabIndex]
+        this.selectedTabs.splice(clickedTabIndex, 1)
+        this.selectedTabs.unshift(clickedTab)
+        this.requestUpdate()
+      }
+    } catch (error) {
+      console.error('Error switching to tab:', error)
+    }
+  }
+
   getTopicIcon(topic: string): string {
     const icons: { [key: string]: string } = {
       travel: '✈️',
@@ -1583,48 +1803,138 @@ ${pageContent.slice(0, 4000)}`
                 `
               : ''}
 
-            <textarea
-              .value="${this.query}"
-              @input="${(e: Event) => {
-                this.query = (e.target as HTMLTextAreaElement).value
-                this.selectedSuggestionIndex = -1
-                // Reset userHasEditedQuery if query becomes empty
-                if (!this.query.trim()) {
-                  this.userHasEditedQuery = false
-                } else {
-                  this.userHasEditedQuery = true
-                }
-              }}"
-              @keydown="${this.handleKeyDown}"
-              class="query-input"
-              placeholder="${this.aiResponse || this.currentChatId
-                ? 'Continue the conversation…'
-                : 'Ask, search, or type a URL…'}"
-            ></textarea>
-
-            <div class="button-row">
-              <button
-                class="primary-button"
-                @click="${this.handleSubmit}"
-                ?disabled="${this.isProcessing || !this.query.trim()}"
-              >
-                ${this.aiResponse || this.currentChatId
-                  ? '💬 Ask'
-                  : `${this.getQueryTypeIcon(this.detectQueryType(this.query))} ${this.getQueryTypeLabel(this.detectQueryType(this.query))}`}
-              </button>
-              ${this.showSummarizeButton
-                ? html`
-                    <button
-                      class="primary-button"
-                      @click="${this.handleSummarizePage}"
-                      ?disabled="${!this.hasOpenAIKey || this.isProcessing}"
+            <!-- TAB SELECTION MENU -->
+            ${this.showTabsMenu
+              ? html`
+                  <div
+                    class="tabs-menu-overlay"
+                    @click="${() => {
+                      this.showTabsMenu = false
+                      this.requestUpdate()
+                    }}"
+                  >
+                    <div
+                      class="tabs-menu"
+                      @click="${(e: Event) => e.stopPropagation()}"
                     >
-                      <span class="summarize-icon">📄</span>
-                      Summarize Page
-                    </button>
-                  `
-                : ''}
+                      <div class="tabs-menu-header">
+                        <span>Recent tabs</span>
+                      </div>
+                      <div class="tabs-menu-list">
+                        ${this.availableTabs.map(
+                          (tab) => html`
+                            <button
+                              class="tab-menu-item"
+                              @click="${() => this.handleTabSelect(tab)}"
+                            >
+                              <img
+                                src="${tab.favicon}"
+                                alt=""
+                                class="tab-favicon"
+                                @error="${(e: Event) => {
+                                  ;(e.target as HTMLImageElement).src =
+                                    DEFAULT_FAVICON
+                                }}"
+                              />
+                              <span class="tab-title">${tab.title}</span>
+                            </button>
+                          `,
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                `
+              : ''}
+
+            <div class="textarea-container">
+              <textarea
+                .value="${this.query}"
+                @input="${(e: Event) => {
+                  this.query = (e.target as HTMLTextAreaElement).value
+                  this.selectedSuggestionIndex = -1
+                  // Reset userHasEditedQuery if query becomes empty
+                  if (!this.query.trim()) {
+                    this.userHasEditedQuery = false
+                  } else {
+                    this.userHasEditedQuery = true
+                  }
+                }}"
+                @keydown="${this.handleKeyDown}"
+                class="query-input"
+                placeholder="${this.aiResponse || this.currentChatId
+                  ? 'Continue the conversation…'
+                  : 'Ask, search, or type a URL…'}"
+              ></textarea>
+
+              <!-- BOTTOM TOOLBAR -->
+              <div class="bottom-toolbar">
+                <!-- ADD TAB BUTTON -->
+                <button
+                  class="add-tab-button"
+                  @click="${this.handleAddTabClick}"
+                  title="Add tabs"
+                >
+                  +
+                </button>
+
+                <!-- SELECTED TABS LIST -->
+                <div class="selected-tabs-container">
+                  ${this.selectedTabs.map(
+                    (tab) => html`
+                      <button
+                        class="selected-tab"
+                        @click="${() => this.handleSelectedTabClick(tab.id)}"
+                      >
+                        <img
+                          src="${tab.favicon}"
+                          alt=""
+                          class="selected-tab-favicon"
+                          @error="${(e: Event) => {
+                            ;(e.target as HTMLImageElement).src =
+                              DEFAULT_FAVICON
+                          }}"
+                        />
+                        <span class="selected-tab-title">${tab.title}</span>
+                        <div
+                          class="remove-tab"
+                          @click="${(e: Event) => {
+                            e.stopPropagation()
+                            this.handleRemoveTab(tab.id)
+                          }}"
+                        >
+                          ×
+                        </div>
+                      </button>
+                    `,
+                  )}
+                </div>
+
+                <!-- SUBMIT BUTTON -->
+                <button
+                  class="submit-button"
+                  @click="${this.handleSubmit}"
+                  ?disabled="${this.isProcessing || !this.query.trim()}"
+                >
+                  ${this.aiResponse || this.currentChatId
+                    ? '💬 Ask'
+                    : `${this.getQueryTypeIcon(this.detectQueryType(this.query))} ${this.getQueryTypeLabel(this.detectQueryType(this.query))}`}
+                </button>
+              </div>
             </div>
+
+            ${this.showSummarizeButton
+              ? html`
+                  <button
+                    class="primary-button"
+                    @click="${this.handleSummarizePage}"
+                    ?disabled="${!this.hasOpenAIKey || this.isProcessing}"
+                    style="margin-top: 8px;"
+                  >
+                    <span class="summarize-icon">📄</span>
+                    Summarize Page
+                  </button>
+                `
+              : ''}
           </div>
         </div>
       </div>
@@ -2183,6 +2493,264 @@ ${pageContent.slice(0, 4000)}`
         opacity: 1;
         background-color: #ff6b6b;
         color: white;
+      }
+
+      /* Tab Selection Menu */
+      .tabs-menu-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.2);
+        z-index: 2000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .tabs-menu {
+        position: absolute;
+        bottom: 120px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: var(--color-background);
+        border: 1px solid var(--color-border-light);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        min-width: 280px;
+        max-width: 320px;
+        max-height: 300px;
+        overflow: hidden;
+      }
+
+      .tabs-menu-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--color-border-light);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--color-text);
+        background-color: var(--header-background);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .tabs-menu-header::before {
+        content: '🗂️';
+        font-size: 14px;
+      }
+
+      .tabs-menu-list {
+        max-height: 250px;
+        overflow-y: auto;
+        padding: 4px 0;
+      }
+
+      .tab-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px;
+        width: 100%;
+        background: none;
+        border: none;
+        text-align: left;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        font-size: 12px;
+        color: var(--color-text);
+      }
+
+      .tab-menu-item:hover {
+        background-color: var(--color-button-clear-bg-hover);
+      }
+
+      .tab-favicon {
+        width: 16px;
+        height: 16px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+
+      .tab-title {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+      }
+
+      /* Textarea Container */
+      .textarea-container {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .query-input {
+        flex: 1;
+        resize: none;
+        padding: 12px;
+        padding-bottom: 50px;
+        border: 1px solid var(--color-border-light);
+        border-radius: 12px;
+        background-color: var(--color-background);
+        color: var(--color-text);
+        margin: 0;
+        min-height: 80px;
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+
+      .query-input:focus {
+        outline: none;
+        border-color: var(--color-button-bg);
+        box-shadow: 0 0 0 2px rgba(220, 189, 230, 0.3);
+      }
+
+      /* Bottom Toolbar */
+      .bottom-toolbar {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 10;
+      }
+
+      /* Add Tab Button */
+      .add-tab-button {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: none;
+        background-color: var(--color-button-clear-bg);
+        color: var(--color-text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: bold;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      .add-tab-button:hover {
+        background-color: var(--color-button-clear-bg-hover);
+        transform: scale(1.05);
+      }
+
+      /* Selected Tabs Container */
+      .selected-tabs-container {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        flex: 1;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        min-width: 0;
+      }
+
+      .selected-tabs-container::-webkit-scrollbar {
+        display: none;
+      }
+
+      .selected-tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 6px 4px 8px;
+        background-color: var(--color-background);
+        border: 1px solid var(--color-border-light);
+        border-radius: 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 11px;
+        color: var(--color-text);
+        white-space: nowrap;
+        flex-shrink: 0;
+        max-width: 120px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        position: relative;
+      }
+
+      .selected-tab:hover {
+        background-color: var(--color-button-clear-bg-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+
+      .selected-tab-favicon {
+        width: 14px;
+        height: 14px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+
+      /* Submit Button */
+      .submit-button {
+        padding: 8px 12px;
+        border-radius: 18px;
+        border: none;
+        background-color: var(--color-button-bg);
+        color: var(--color-button-text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      .submit-button:hover {
+        background-color: var(--color-button-bg-hover);
+        transform: scale(1.05);
+      }
+
+      .submit-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .selected-tab-title {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+        max-width: 55px;
+        padding-right: 2px;
+      }
+
+      .remove-tab {
+        background-color: rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        color: #666;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      .remove-tab:hover {
+        background-color: #ff6b6b;
+        color: white;
+        transform: scale(1.1);
       }
     `
   }

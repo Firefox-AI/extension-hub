@@ -27,6 +27,7 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     component: () =>
       html`<moz-ai-mode>
         <i class="fa-solid fa-bars" slot="menu-icon"></i>
+        <i class="fa-solid fa-pen-to-square" slot="new-chat-icon"></i>
         <i class="fa-solid fa-expand" slot="expand-icon"></i>
       </moz-ai-mode>`,
   },
