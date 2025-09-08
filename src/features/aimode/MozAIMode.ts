@@ -402,6 +402,8 @@ class MozAIMode extends LitElement {
   isClassifyingTopic: boolean = false
   usePersonalInsights: boolean = false
   showTabsMenu: boolean = false
+  isLoadingLiveSuggestions: boolean = false
+  private liveSearchDebounceTimer?: number
   selectedTabs: Array<{ id: number; title: string; favicon: string }> = []
   availableTabs: Array<{
     id: number
@@ -430,6 +432,7 @@ class MozAIMode extends LitElement {
       isClassifyingTopic: { type: Boolean },
       usePersonalInsights: { type: Boolean },
       showTabsMenu: { type: Boolean },
+      isLoadingLiveSuggestions: { type: Boolean },
       selectedTabs: { type: Array },
       availableTabs: { type: Array },
     }
@@ -464,6 +467,9 @@ class MozAIMode extends LitElement {
     this.keyStatusCleanup?.()
     browser.tabs.onActivated.removeListener(this.handleTabChanged)
     browser.tabs.onUpdated.removeListener(this.handleTabUpdated)
+    if (this.liveSearchDebounceTimer) {
+      clearTimeout(this.liveSearchDebounceTimer)
+    }
   }
 
   async initializeOpenAIKeyStatus() {
@@ -660,10 +666,117 @@ class MozAIMode extends LitElement {
     }
   }
 
+  async generateLiveSuggestions(query: string) {
+    if (!query.trim()) return
+
+    this.isLoadingLiveSuggestions = true
+    this.requestUpdate()
+
+    try {
+      const urlbarSuggestions = await (
+        browser as unknown as mlBrowserT
+      ).extensionHub.getUrlbarSuggestions(query.trim())
+
+      const suggestions = []
+
+      // Get search results from urlbar
+      const searchResults = urlbarSuggestions.filter((s) => s.type === 'search')
+
+      if (searchResults.length > 0) {
+        // First search result - create both search and chat variants
+        const firstResult = searchResults[0]
+
+        // Original as search type with personalization
+        suggestions.push({
+          text: firstResult.text + this.getPersonalizedContext(),
+          type: 'search',
+        })
+
+        // Same text with "?" as chat type with personalization
+        suggestions.push({
+          text: firstResult.text + this.getPersonalizedContext() + '?',
+          type: 'chat',
+        })
+
+        // Next 4 search results - run through detectQueryType to determine final type
+        const remainingResults = searchResults.slice(1, 5)
+        for (const result of remainingResults) {
+          const detectedType = this.detectQueryType(result.text)
+          const personalizedText =
+            detectedType === 'chat' || detectedType === 'search'
+              ? result.text + this.getPersonalizedContext()
+              : result.text
+
+          suggestions.push({
+            text: personalizedText,
+            type: detectedType,
+          })
+        }
+      }
+
+      // Add navigate results as-is (no personalization)
+      const navigateResults = urlbarSuggestions.filter(
+        (s) => s.type === 'navigate',
+      )
+      const navigateSuggestions = navigateResults.slice(0, 2).map((s) => ({
+        text: s.text,
+        type: s.type,
+      }))
+      suggestions.push(...navigateSuggestions)
+
+      // Add action results as-is (no personalization)
+      const actionResults = urlbarSuggestions.filter((s) => s.type === 'action')
+      const actionSuggestions = actionResults.slice(0, 2).map((s) => ({
+        text: s.text,
+        type: s.type,
+      }))
+      suggestions.push(...actionSuggestions)
+
+      this.querySuggestions = suggestions
+    } catch (error) {
+      console.error('Error getting live suggestions:', error)
+      // Fall back to empty suggestions on error
+      this.querySuggestions = []
+    } finally {
+      this.isLoadingLiveSuggestions = false
+      this.requestUpdate()
+    }
+  }
+
+  getPersonalizedContext(): string {
+    if (!this.usePersonalInsights) return ''
+
+    const topicKey = this.currentTopic as keyof typeof TOPIC_SUGGESTIONS
+    const topicInsights = PERSONAL_INSIGHTS.topicInsights[topicKey] || []
+    const generalInsights = PERSONAL_INSIGHTS.generalInsights
+
+    let context = ''
+    // Select random insights for each suggestion
+    const selectedTopicInsight =
+      topicInsights[Math.floor(Math.random() * topicInsights.length)]
+    const selectedGeneralInsight =
+      generalInsights[Math.floor(Math.random() * generalInsights.length)]
+
+    if (selectedTopicInsight) context += ` ${selectedTopicInsight}`
+    if (selectedGeneralInsight) context += ` ${selectedGeneralInsight}`
+
+    return context
+  }
+
   detectQueryType(query: string): string {
     const trimmedQuery = query.trim().toLowerCase()
 
-    // Domain detection: no spaces with at least one period (supports subdomains)
+    // URL detection: starts with http/https or contains protocol-like patterns
+    if (
+      /^https?:\/\//.test(trimmedQuery) ||
+      /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(
+        trimmedQuery.replace(/^https?:\/\//, ''),
+      )
+    ) {
+      return 'navigate'
+    }
+
+    // Domain detection: no spaces with at least one period (supports subdomains and paths)
     if (
       /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery) &&
       !trimmedQuery.includes(' ')
@@ -671,13 +784,20 @@ class MozAIMode extends LitElement {
       return 'navigate'
     }
 
-    // Chat detection: starts with question words
-    if (/^(who|what|when|where|why|how)\s/.test(trimmedQuery)) {
+    // Chat detection: starts with question words OR ends with question mark
+    if (
+      /^(who|what|when|where|why|how)\s/.test(trimmedQuery) ||
+      trimmedQuery.endsWith('?')
+    ) {
       return 'chat'
     }
 
-    // Action detection: starts with "tab" or "find"
-    if (trimmedQuery.startsWith('tab') || trimmedQuery.startsWith('find')) {
+    // Action detection: starts with "tab" or "find" or "tab switch:"
+    if (
+      trimmedQuery.startsWith('tab') ||
+      trimmedQuery.startsWith('find') ||
+      trimmedQuery.startsWith('tab switch:')
+    ) {
       return 'action'
     }
 
@@ -727,25 +847,6 @@ class MozAIMode extends LitElement {
       TOPIC_SUGGESTIONS[topicKey] || TOPIC_SUGGESTIONS.general
     const topic = titleWords.join(' ') || 'this'
 
-    const getPersonalizedContext = () => {
-      if (!this.usePersonalInsights) return ''
-
-      const topicInsights = PERSONAL_INSIGHTS.topicInsights[topicKey] || []
-      const generalInsights = PERSONAL_INSIGHTS.generalInsights
-
-      let context = ''
-      // Select random insights for each suggestion
-      const selectedTopicInsight =
-        topicInsights[Math.floor(Math.random() * topicInsights.length)]
-      const selectedGeneralInsight =
-        generalInsights[Math.floor(Math.random() * generalInsights.length)]
-
-      if (selectedTopicInsight) context += ` ${selectedTopicInsight}`
-      if (selectedGeneralInsight) context += ` ${selectedGeneralInsight}`
-
-      return context
-    }
-
     // 2 chat prompts using topic-aware templates with individual personalization
     const chatTemplates = [...topicTemplates.chat].sort(
       () => Math.random() - 0.5,
@@ -753,12 +854,14 @@ class MozAIMode extends LitElement {
     suggestions.push(
       {
         text:
-          chatTemplates[0].replace('{topic}', topic) + getPersonalizedContext(),
+          chatTemplates[0].replace('{topic}', topic) +
+          this.getPersonalizedContext(),
         type: 'chat',
       },
       {
         text:
-          chatTemplates[1].replace('{topic}', topic) + getPersonalizedContext(),
+          chatTemplates[1].replace('{topic}', topic) +
+          this.getPersonalizedContext(),
         type: 'chat',
       },
     )
@@ -771,13 +874,13 @@ class MozAIMode extends LitElement {
       {
         text:
           searchTemplates[0].replace('{topic}', topic) +
-          getPersonalizedContext(),
+          this.getPersonalizedContext(),
         type: 'search',
       },
       {
         text:
           searchTemplates[1].replace('{topic}', topic) +
-          getPersonalizedContext(),
+          this.getPersonalizedContext(),
         type: 'search',
       },
     )
@@ -1361,11 +1464,9 @@ ${pageContent.slice(0, 4000)}`
   handleSuggestionHover(index: number) {
     this.selectedSuggestionIndex = index
 
-    // Only change query if user hasn't manually edited it
-    if (!this.userHasEditedQuery) {
-      const suggestion = this.querySuggestions[index]
-      this.query = suggestion.text
-    }
+    // Always fill query on hover - works for both quick prompts and live suggestions
+    const suggestion = this.querySuggestions[index]
+    this.query = suggestion.text
 
     this.requestUpdate()
 
@@ -1457,14 +1558,23 @@ ${pageContent.slice(0, 4000)}`
       console.error('Error saving personal insights preference:', error)
     }
 
-    // Regenerate suggestions with new setting
-    const tabs = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    })
-    const activeTab = tabs[0]
-    if (activeTab) {
-      this.generateQuerySuggestions(activeTab.title || '', activeTab.url || '')
+    // Regenerate suggestions with new setting - maintain current mode
+    if (this.userHasEditedQuery && this.query.trim()) {
+      // User was actively typing - regenerate live suggestions
+      this.generateLiveSuggestions(this.query)
+    } else {
+      // Generate quick prompts for empty query
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      })
+      const activeTab = tabs[0]
+      if (activeTab) {
+        this.generateQuerySuggestions(
+          activeTab.title || '',
+          activeTab.url || '',
+        )
+      }
     }
 
     this.requestUpdate()
@@ -1713,11 +1823,7 @@ ${pageContent.slice(0, 4000)}`
             </div>
           </div>
 
-          <div
-            class="content"
-            @mousemove="${this.handleContentMouseMove}"
-            @mouseleave="${this.handleContentMouseLeave}"
-          >
+          <div class="content" @mousemove="${this.handleContentMouseMove}">
             <!-- OPENAI KEY WARNING -->
             ${!this.hasOpenAIKey
               ? html`
@@ -1741,10 +1847,23 @@ ${pageContent.slice(0, 4000)}`
                     class="query-suggestions ${this.hasMouseMoved
                       ? 'mouse-moved'
                       : ''}"
+                    @mouseleave="${this.handleContentMouseLeave}"
                   >
                     <div class="suggestions-header">
                       <div class="suggestions-header-left">
-                        <span>Suggest:</span>
+                        <span
+                          >${this.userHasEditedQuery
+                            ? 'Suggestions:'
+                            : 'Quick Prompts:'}</span
+                        >
+                        ${this.isLoadingLiveSuggestions
+                          ? html`
+                              <span class="loading-indicator">
+                                <span class="loading-spinner">⟳</span>
+                                Loading...
+                              </span>
+                            `
+                          : ''}
                         ${this.currentTopic !== 'general' &&
                         this.topicConfidence > 0
                           ? html`
@@ -1855,8 +1974,33 @@ ${pageContent.slice(0, 4000)}`
                   // Reset userHasEditedQuery if query becomes empty
                   if (!this.query.trim()) {
                     this.userHasEditedQuery = false
+                    // Generate quick prompts for empty query
+                    const tabs = browser.tabs
+                      .query({
+                        active: true,
+                        currentWindow: true,
+                      })
+                      .then((tabs) => {
+                        const activeTab = tabs[0]
+                        if (activeTab) {
+                          this.generateQuerySuggestions(
+                            activeTab.title || '',
+                            activeTab.url || '',
+                          )
+                        }
+                      })
+                      .catch((err) =>
+                        console.error('Error getting active tab:', err),
+                      )
                   } else {
                     this.userHasEditedQuery = true
+                    // Debounce live suggestions to avoid too many API calls
+                    if (this.liveSearchDebounceTimer) {
+                      clearTimeout(this.liveSearchDebounceTimer)
+                    }
+                    this.liveSearchDebounceTimer = window.setTimeout(() => {
+                      this.generateLiveSuggestions(this.query)
+                    }, 50)
                   }
                 }}"
                 @keydown="${this.handleKeyDown}"
@@ -2246,6 +2390,15 @@ ${pageContent.slice(0, 4000)}`
       .classifying {
         font-style: italic;
         opacity: 0.7;
+      }
+
+      .loading-indicator {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-style: italic;
+        opacity: 0.8;
+        font-size: 10px;
       }
 
       .personalization-toggle {

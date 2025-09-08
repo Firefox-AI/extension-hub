@@ -1,4 +1,9 @@
-import type { mlBrowserT, TabsCollectionT, SemanticMatchT } from '../types'
+import type {
+  mlBrowserT,
+  SemanticMatchT,
+  TabsCollectionT,
+  UrlbarSuggestionT,
+} from '../types'
 
 declare const ChromeUtils: any
 declare const ExtensionAPI: any
@@ -22,6 +27,9 @@ const lazy: {
   GenAI?: any
   getPlacesSemanticHistoryManager?: any
   SmartTabGroupingManager?: any
+  UrlbarController?: any
+  UrlbarProvidersManager?: any
+  UrlbarQueryContext?: any
 } = {}
 ChromeUtils.defineESModuleGetters(lazy, {
   AboutNewTab: 'resource:///modules/AboutNewTab.sys.mjs',
@@ -33,6 +41,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
     'resource://gre/modules/PlacesSemanticHistoryManager.sys.mjs',
   SmartTabGroupingManager:
     'moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs',
+  UrlbarController: 'resource:///modules/UrlbarController.sys.mjs',
+  UrlbarProvidersManager: 'resource:///modules/UrlbarProvidersManager.sys.mjs',
+  UrlbarQueryContext: 'resource:///modules/UrlbarUtils.sys.mjs',
 })
 
 function getAllTabsFromAllWindows(): BrowserTab[] {
@@ -254,6 +265,96 @@ export default class extends ExtensionAPI {
           } catch (error) {
             console.error('Failed to find in page:', error)
             return false
+          }
+        },
+
+        async getUrlbarSuggestions(
+          searchString: string,
+        ): Promise<UrlbarSuggestionT[]> {
+          try {
+            if (!searchString.trim()) {
+              return []
+            }
+
+            // Create a UrlbarQueryContext for the search
+            const context = new lazy.UrlbarQueryContext({
+              searchString: searchString.trim(),
+              allowAutofill: false,
+              isPrivate: false,
+              maxResults: 20,
+              userContextId: 0,
+            })
+
+            const window = Services.wm.getMostRecentBrowserWindow()
+            // Create UrlbarController as shown in your example
+            const controller = new lazy.UrlbarController({
+              input: {
+                isPrivate: false,
+                onFirstResult() {},
+                window,
+              },
+            })
+
+            // Start the query and wait for results
+            await lazy.UrlbarProvidersManager.startQuery(context, controller)
+
+            // Process the results
+            const suggestions = []
+
+            for (const result of context.results) {
+              let suggestion = {
+                type: '' as 'search' | 'navigate' | 'action',
+                text: '',
+                title: '',
+                url: '',
+                icon: '',
+                description: '',
+              }
+
+              // Map Firefox result types to our suggestion types
+              switch (result.type) {
+                case 1: // Tab switch
+                  suggestion.type = 'action'
+                  suggestion.text = `tab switch: ${result.payload.title || result.payload.url || ''}`
+                  suggestion.title = result.payload.title || ''
+                  suggestion.url = result.payload.url || ''
+                  suggestion.icon = result.payload.icon || ''
+                  break
+
+                case 2: // Search suggestion
+                  suggestion.type = 'search'
+                  suggestion.text =
+                    result.payload.suggestion ||
+                    result.payload.query ||
+                    searchString
+                  suggestion.title = result.payload.suggestion || ''
+                  suggestion.description = result.payload.description || ''
+                  suggestion.icon = result.payload.icon || ''
+                  break
+
+                case 3: // URL/bookmark
+                  suggestion.type = 'navigate'
+                  suggestion.text =
+                    result.payload.displayUrl || result.payload.url || ''
+                  suggestion.title = result.payload.title || ''
+                  suggestion.url = result.payload.url || ''
+                  suggestion.icon = result.payload.icon || ''
+                  break
+
+                default:
+                  continue // Skip unknown types
+              }
+
+              // Only add non-empty suggestions
+              if (suggestion.text.trim()) {
+                suggestions.push(suggestion)
+              }
+            }
+
+            return suggestions
+          } catch (error) {
+            console.error('Failed to get urlbar suggestions:', error)
+            return []
           }
         },
       },

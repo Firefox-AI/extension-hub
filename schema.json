@@ -83,6 +83,17 @@
           }
         ],
         "type": "function"
+      },
+      {
+        "async": true,
+        "name": "getUrlbarSuggestions",
+        "parameters": [
+          {
+            "name": "searchString",
+            "type": "string"
+          }
+        ],
+        "type": "function"
       }
     ],
     "namespace": "extensionHub"

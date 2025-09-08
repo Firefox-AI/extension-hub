@@ -11,6 +11,15 @@ export type SemanticMatchResultT = {
   stories: SemanticMatchT[]
 }
 
+export type UrlbarSuggestionT = {
+  type: 'search' | 'navigate' | 'action'
+  text: string
+  title?: string
+  url?: string
+  icon?: string
+  description?: string
+}
+
 export type mlBrowserT = {
   extensionHub: {
     getTabs: () => Promise<TabsCollectionT>
@@ -21,6 +30,7 @@ export type mlBrowserT = {
     askChat: (prompt: string) => Promise<void>
     getBoolPref: (prefName: string) => Promise<boolean>
     findInPage: (query: string) => Promise<boolean>
+    getUrlbarSuggestions: (searchString: string) => Promise<UrlbarSuggestionT[]>
   }
   trial?: {
     ml: {
