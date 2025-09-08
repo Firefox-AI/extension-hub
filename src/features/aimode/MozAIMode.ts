@@ -378,6 +378,31 @@ const TOPIC_DOMAINS = {
 }
 
 class MozAIMode extends LitElement {
+  // Helper to detect if a tab URL is an about: page
+  private isAboutPage(url: string | undefined): boolean {
+    if (!url) return true
+    return url.startsWith('about:')
+  }
+
+  // Helper to open URL, replacing about: pages or creating new tab with grouping
+  private async openUrl(url: string): Promise<void> {
+    const tabs = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    })
+    const activeTab = tabs[0]
+
+    if (this.isAboutPage(activeTab?.url) && this.currentTabId) {
+      // Replace current about: page
+      await browser.tabs.update(this.currentTabId, { url })
+    } else {
+      // Create new tab and add to group
+      const newTab = await browser.tabs.create({ url })
+      if (newTab.id) {
+        await this.addTabToGroup(newTab.id)
+      }
+    }
+  }
   query: string = ''
   hasOpenAIKey: boolean = false
   aiResponse: string = ''
@@ -977,7 +1002,7 @@ class MozAIMode extends LitElement {
       const lastAssistantMessage = relevantChat.messages
         ?.filter((m) => m.role === 'assistant')
         .pop()
-      this.query = lastUserMessage?.content || ''
+      this.query = ''
       this.aiResponse = lastAssistantMessage?.content || ''
     } else {
       this.currentChatId = null
@@ -1105,12 +1130,7 @@ class MozAIMode extends LitElement {
     try {
       const url = domain.startsWith('http') ? domain : `https://${domain}`
       this.skipNextTabUpdate = true
-      const newTab = await browser.tabs.create({ url })
-
-      // Add the new tab to current group if group exists, or create new group
-      if (newTab.id) {
-        await this.addTabToGroup(newTab.id)
-      }
+      await this.openUrl(url)
     } catch (error) {
       console.error('Error navigating:', error)
       this.aiResponse = `Sorry, couldn't navigate to ${domain}`
@@ -1147,12 +1167,7 @@ class MozAIMode extends LitElement {
     try {
       const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`
       this.skipNextTabUpdate = true
-      const newTab = await browser.tabs.create({ url: searchUrl })
-
-      // Add the new tab to current group if group exists, or create new group
-      if (newTab.id) {
-        await this.addTabToGroup(newTab.id)
-      }
+      await this.openUrl(searchUrl)
 
       this.query = '' // Clear the input box
       this.userHasEditedQuery = false
@@ -1230,6 +1245,7 @@ class MozAIMode extends LitElement {
       } else {
         response = await this.handleChat(queryToSubmit)
       }
+      this.query = ''
 
       const now = Date.now()
       const userMessage: AIModeMessage = {
@@ -1528,7 +1544,7 @@ ${pageContent.slice(0, 4000)}`
       const lastAssistantMessage = chat.messages
         ?.filter((m) => m.role === 'assistant')
         .pop()
-      this.query = lastUserMessage?.content || ''
+      this.query = ''
       this.aiResponse = lastAssistantMessage?.content || ''
       this.showMenu = false
       this.requestUpdate()
