@@ -385,7 +385,16 @@ export default class extends ExtensionAPI {
 
               // Create focus handler if it doesn't exist yet
               if (!urlbar._aiModeFocusHandler) {
-                urlbar._aiModeFocusHandler = () => {
+                urlbar._aiModeFocusHandler = (saveUrl: boolean) => {
+                  // Store current URL for AI Mode component to retrieve
+                  if (saveUrl) {
+                    const currentUrl =
+                      window.gBrowser.selectedBrowser.currentURI.spec
+                    if (currentUrl && !currentUrl.startsWith('about:')) {
+                      urlbar.lastFocusedUrl = currentUrl
+                    }
+                  }
+
                   // Directly focus the sidebar
                   try {
                     if (
@@ -408,7 +417,7 @@ export default class extends ExtensionAPI {
               }
 
               urlbar.addEventListener('focus', urlbar._aiModeFocusHandler)
-              urlbar._aiModeFocusHandler() // Initial focus redirect
+              urlbar._aiModeFocusHandler(false) // Initial focus redirect
               urlbarFocusEnabled = true
             } else {
               if (!urlbarFocusEnabled) return true
@@ -430,6 +439,7 @@ export default class extends ExtensionAPI {
               // Remove the event listener if it exists
               if (urlbar._aiModeFocusHandler) {
                 urlbar.removeEventListener('focus', urlbar._aiModeFocusHandler)
+                urlbar._aiModeFocusHandler = null
               }
 
               urlbarFocusEnabled = false
@@ -440,6 +450,14 @@ export default class extends ExtensionAPI {
             console.error('Failed to update UI for AI mode:', error)
             return false
           }
+        },
+
+        async getLastFocusedUrl(): Promise<string | null> {
+          const window = Services.wm.getMostRecentBrowserWindow()
+          const urlbar = window.gURLBar
+          const url = urlbar.lastFocusedUrl
+          urlbar.lastFocusedUrl = null // Clear after retrieval
+          return url
         },
       },
     }

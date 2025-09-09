@@ -482,6 +482,10 @@ class MozAIMode extends LitElement {
     browser.runtime.sendMessage({ type: 'aimode_sidebar_ready' })
     browser.tabs.onActivated.addListener(this.handleTabChanged)
     browser.tabs.onUpdated.addListener(this.handleTabUpdated)
+
+    // Add listener for focus events from the browser to get URL
+    window.addEventListener('focus', this.handleFocus)
+
     this.initializeOpenAIKeyStatus()
     await this.loadChatsAndSettings()
     await this.updateCurrentTabInfo()
@@ -505,6 +509,7 @@ class MozAIMode extends LitElement {
     this.keyStatusCleanup?.()
     browser.tabs.onActivated.removeListener(this.handleTabChanged)
     browser.tabs.onUpdated.removeListener(this.handleTabUpdated)
+    window.removeEventListener('focus', this.handleFocus)
     if (this.liveSearchDebounceTimer) {
       clearTimeout(this.liveSearchDebounceTimer)
     }
@@ -1338,6 +1343,33 @@ class MozAIMode extends LitElement {
     }
   }
 
+  handleFocus = async () => {
+    try {
+      // Get the last focused URL from the API
+      const url = await (
+        browser as unknown as mlBrowserT
+      ).extensionHub.getLastFocusedUrl()
+      if (url && typeof url === 'string') {
+        // Reset current conversation when loading URL from urlbar focus
+        this.currentChatId = null
+        this.aiResponse = ''
+        this.showSummarizeButton = false
+
+        // Pre-populate input with URL but keep userHasEditedQuery false
+        // so quick prompts still appear
+        this.query = url
+        this.userHasEditedQuery = false
+        this.selectedSuggestionIndex = -1
+
+        // Focus and select the URL text
+        this.focusInputBox(true)
+        this.requestUpdate()
+      }
+    } catch (error) {
+      console.error('Failed to get last focused URL:', error)
+    }
+  }
+
   async handleSummarizePage() {
     if (!this.hasOpenAIKey) return
 
@@ -1502,7 +1534,7 @@ ${pageContent.slice(0, 4000)}`
     }
   }
 
-  focusInputBox() {
+  focusInputBox(selectAll = false) {
     // Use setTimeout to ensure DOM is ready after component initialization
     setTimeout(() => {
       const textarea = this.shadowRoot?.querySelector(
@@ -1510,6 +1542,10 @@ ${pageContent.slice(0, 4000)}`
       ) as HTMLTextAreaElement
       if (textarea) {
         textarea.focus()
+        if (selectAll) {
+          // Select all text in the input box
+          textarea.select()
+        }
       }
     }, 100)
   }

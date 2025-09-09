@@ -105,6 +105,12 @@
           }
         ],
         "type": "function"
+      },
+      {
+        "async": true,
+        "name": "getLastFocusedUrl",
+        "parameters": [],
+        "type": "function"
       }
     ],
     "namespace": "extensionHub"
