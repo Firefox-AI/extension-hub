@@ -436,6 +436,7 @@ class MozAIMode extends LitElement {
     url: string
     favicon: string
   }> = []
+  redirectUrlbarToSidebar: boolean = false
 
   static get properties() {
     return {
@@ -460,6 +461,7 @@ class MozAIMode extends LitElement {
       isLoadingLiveSuggestions: { type: Boolean },
       selectedTabs: { type: Array },
       availableTabs: { type: Array },
+      redirectUrlbarToSidebar: { type: Boolean },
     }
   }
 
@@ -484,7 +486,18 @@ class MozAIMode extends LitElement {
     await this.loadChatsAndSettings()
     await this.updateCurrentTabInfo()
     await this.loadPersonalInsightsPreference()
+    await this.loadUrlbarRedirectPreference()
     await this.initializeCurrentTabInSelectedList()
+
+    // Focus the input box by default
+    this.focusInputBox()
+
+    // If urlbar redirect is already enabled, activate the AI mode UI
+    if (this.redirectUrlbarToSidebar) {
+      await (browser as unknown as mlBrowserT).extensionHub.updateUIForAIMode(
+        true,
+      )
+    }
   }
 
   disconnectedCallback() {
@@ -569,6 +582,18 @@ class MozAIMode extends LitElement {
       this.requestUpdate()
     } catch (error) {
       console.error('Error loading personal insights preference:', error)
+    }
+  }
+
+  async loadUrlbarRedirectPreference() {
+    try {
+      const { ai_mode_urlbar_redirect } = await browser.storage.local.get([
+        'ai_mode_urlbar_redirect',
+      ])
+      this.redirectUrlbarToSidebar = ai_mode_urlbar_redirect || false
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Error loading urlbar redirect preference:', error)
     }
   }
 
@@ -1477,6 +1502,18 @@ ${pageContent.slice(0, 4000)}`
     }
   }
 
+  focusInputBox() {
+    // Use setTimeout to ensure DOM is ready after component initialization
+    setTimeout(() => {
+      const textarea = this.shadowRoot?.querySelector(
+        '.query-input',
+      ) as HTMLTextAreaElement
+      if (textarea) {
+        textarea.focus()
+      }
+    }, 100)
+  }
+
   handleSuggestionHover(index: number) {
     this.selectedSuggestionIndex = index
 
@@ -1487,12 +1524,7 @@ ${pageContent.slice(0, 4000)}`
     this.requestUpdate()
 
     // Focus the input box
-    const textarea = this.shadowRoot?.querySelector(
-      '.query-input',
-    ) as HTMLTextAreaElement
-    if (textarea) {
-      textarea.focus()
-    }
+    this.focusInputBox()
   }
 
   handleSuggestionClick(e: MouseEvent) {
@@ -1596,6 +1628,27 @@ ${pageContent.slice(0, 4000)}`
     this.requestUpdate()
   }
 
+  async handleUrlbarRedirectToggle() {
+    this.redirectUrlbarToSidebar = !this.redirectUrlbarToSidebar
+
+    // Save preference
+    try {
+      await browser.storage.local.set({
+        ai_mode_urlbar_redirect: this.redirectUrlbarToSidebar,
+      })
+    } catch (error) {
+      console.error('Error saving urlbar redirect preference:', error)
+    }
+
+    // Update UI for AI mode based on the new state
+    await (browser as unknown as mlBrowserT).extensionHub.updateUIForAIMode(
+      this.redirectUrlbarToSidebar,
+    )
+
+    this.showMenu = false
+    this.requestUpdate()
+  }
+
   handleAddTabClick() {
     this.showTabsMenu = !this.showTabsMenu
     if (this.showTabsMenu) {
@@ -1691,8 +1744,13 @@ ${pageContent.slice(0, 4000)}`
   }
 
   render() {
+    const hasConversation = !!(this.aiResponse || this.currentChatId)
     return html`
-      <div class="wrapper">
+      <div
+        class="wrapper ${this.redirectUrlbarToSidebar && !hasConversation
+          ? 'ai-mode'
+          : ''}"
+      >
         <div class="container">
           <div class="header">
             <div class="menu-container">
@@ -1744,6 +1802,20 @@ ${pageContent.slice(0, 4000)}`
                           Per Window
                         </button>
                       </div>
+
+                      <div class="menu-section">
+                        <div class="menu-section-title">URL Bar</div>
+                        <button
+                          class="menu-item ${this.redirectUrlbarToSidebar
+                            ? 'active'
+                            : ''}"
+                          @click="${this.handleUrlbarRedirectToggle}"
+                        >
+                          <span class="menu-icon">🔗</span>
+                          Redirect Focus to Sidebar
+                        </button>
+                      </div>
+
                       ${this.chats.length > 0
                         ? html`
                             <div class="menu-section">
@@ -2920,6 +2992,20 @@ ${pageContent.slice(0, 4000)}`
         background-color: #ff6b6b;
         color: white;
         transform: scale(1.1);
+      }
+
+      /* AI Mode Styles */
+      .wrapper.ai-mode {
+        margin-top: -60px;
+        padding-top: 165px;
+      }
+
+      .wrapper.ai-mode .textarea-container {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        z-index: 1000;
       }
     `
   }

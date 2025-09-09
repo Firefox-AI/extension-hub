@@ -58,6 +58,8 @@ function getAllTabsFromAllWindows(): BrowserTab[] {
 
 export default class extends ExtensionAPI {
   getAPI(context: any): { extensionHub: mlBrowserT['extensionHub'] } {
+    let urlbarFocusEnabled = false
+
     return {
       extensionHub: {
         async getTabs(): Promise<TabsCollectionT> {
@@ -355,6 +357,88 @@ export default class extends ExtensionAPI {
           } catch (error) {
             console.error('Failed to get urlbar suggestions:', error)
             return []
+          }
+        },
+
+        async updateUIForAIMode(enabled: boolean): Promise<boolean> {
+          try {
+            const window = Services.wm.getMostRecentBrowserWindow()
+            const sidebar = window.SidebarController
+            const urlbar = window.gURLBar
+
+            if (enabled) {
+              if (urlbarFocusEnabled) return true
+
+              // Apply AI mode UI changes
+              const urlbarElement = window.document.getElementById('urlbar')
+              if (urlbarElement) {
+                urlbarElement.style.opacity = '0.1'
+              }
+
+              const sidebarPanelHeader =
+                sidebar.browser.contentDocument.getElementById(
+                  'sidebar-panel-header',
+                )
+              if (sidebarPanelHeader) {
+                sidebarPanelHeader.hidden = true
+              }
+
+              // Create focus handler if it doesn't exist yet
+              if (!urlbar._aiModeFocusHandler) {
+                urlbar._aiModeFocusHandler = () => {
+                  // Directly focus the sidebar
+                  try {
+                    if (
+                      sidebar &&
+                      sidebar.browser &&
+                      sidebar.browser.contentDocument
+                    ) {
+                      sidebar.show('extensionhub_mozilla_org-sidebar-action')
+                      sidebar.browser.focus()
+                      const browserElement =
+                        sidebar.browser.contentDocument.querySelector('browser')
+                      if (browserElement) {
+                        browserElement.focus()
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Failed to redirect focus to sidebar:', error)
+                  }
+                }
+              }
+
+              urlbar.addEventListener('focus', urlbar._aiModeFocusHandler)
+              urlbar._aiModeFocusHandler() // Initial focus redirect
+              urlbarFocusEnabled = true
+            } else {
+              if (!urlbarFocusEnabled) return true
+
+              // Restore original UI
+              const urlbarElement = window.document.getElementById('urlbar')
+              if (urlbarElement) {
+                urlbarElement.style.opacity = ''
+              }
+
+              const sidebarPanelHeader =
+                sidebar.browser.contentDocument.getElementById(
+                  'sidebar-panel-header',
+                )
+              if (sidebarPanelHeader) {
+                sidebarPanelHeader.hidden = false
+              }
+
+              // Remove the event listener if it exists
+              if (urlbar._aiModeFocusHandler) {
+                urlbar.removeEventListener('focus', urlbar._aiModeFocusHandler)
+              }
+
+              urlbarFocusEnabled = false
+            }
+
+            return true
+          } catch (error) {
+            console.error('Failed to update UI for AI mode:', error)
+            return false
           }
         },
       },

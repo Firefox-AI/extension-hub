@@ -31,6 +31,7 @@ export type mlBrowserT = {
     getBoolPref: (prefName: string) => Promise<boolean>
     findInPage: (query: string) => Promise<boolean>
     getUrlbarSuggestions: (searchString: string) => Promise<UrlbarSuggestionT[]>
+    updateUIForAIMode: (enabled: boolean) => Promise<boolean>
   }
   trial?: {
     ml: {

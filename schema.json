@@ -94,6 +94,17 @@
           }
         ],
         "type": "function"
+      },
+      {
+        "async": true,
+        "name": "updateUIForAIMode",
+        "parameters": [
+          {
+            "name": "enabled",
+            "type": "boolean"
+          }
+        ],
+        "type": "function"
       }
     ],
     "namespace": "extensionHub"
