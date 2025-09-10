@@ -87,7 +87,7 @@ const FEATURE_OPTIONS: FeatureOption[] = [
 ]
 
 class MozExtensionHub extends LitElement {
-  feature: string = FEATURE_OPTIONS[0].value
+  feature: string = ''
 
   static properties = {
     feature: { type: String },
