@@ -11,6 +11,7 @@ import {
   mlBrowserT,
 } from '../../../types'
 import { MlEngineService } from '../../services/mlEngine'
+import { detectQueryType, getQueryTypeIcon, getQueryTypeLabel } from './utils'
 
 // Default favicon for tabs
 const DEFAULT_FAVICON =
@@ -756,7 +757,7 @@ class MozAIMode extends LitElement {
         // Next 4 search results - run through detectQueryType to determine final type
         const remainingResults = searchResults.slice(1, 5)
         for (const result of remainingResults) {
-          const detectedType = this.detectQueryType(result.text)
+          const detectedType = detectQueryType(result.text)
           const personalizedText =
             detectedType === 'chat' || detectedType === 'search'
               ? result.text + this.getPersonalizedContext()
@@ -816,78 +817,6 @@ class MozAIMode extends LitElement {
     if (selectedGeneralInsight) context += ` ${selectedGeneralInsight}`
 
     return context
-  }
-
-  detectQueryType(query: string): string {
-    const trimmedQuery = query.trim().toLowerCase()
-
-    // URL detection: starts with http/https or contains protocol-like patterns
-    if (
-      /^https?:\/\//.test(trimmedQuery) ||
-      /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(
-        trimmedQuery.replace(/^https?:\/\//, ''),
-      )
-    ) {
-      return 'navigate'
-    }
-
-    // Domain detection: no spaces with at least one period (supports subdomains and paths)
-    if (
-      /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmedQuery) &&
-      !trimmedQuery.includes(' ')
-    ) {
-      return 'navigate'
-    }
-
-    // Chat detection: starts with question words OR ends with question mark
-    if (
-      /^(who|what|when|where|why|how)\s/.test(trimmedQuery) ||
-      trimmedQuery.endsWith('?')
-    ) {
-      return 'chat'
-    }
-
-    // Action detection: starts with "tab" or "find" or "tab switch:"
-    if (
-      trimmedQuery.startsWith('tab') ||
-      trimmedQuery.startsWith('find') ||
-      trimmedQuery.startsWith('tab switch:')
-    ) {
-      return 'action'
-    }
-
-    // Default to search
-    return 'search'
-  }
-
-  getQueryTypeIcon(type: string): string {
-    switch (type) {
-      case 'navigate':
-        return '🌐'
-      case 'chat':
-        return '💬'
-      case 'action':
-        return '⚡'
-      case 'search':
-        return '🔍'
-      default:
-        return '🔍'
-    }
-  }
-
-  getQueryTypeLabel(type: string): string {
-    switch (type) {
-      case 'navigate':
-        return 'Navigate'
-      case 'chat':
-        return 'Ask'
-      case 'action':
-        return 'Action'
-      case 'search':
-        return 'Search'
-      default:
-        return 'Search'
-    }
   }
 
   generateQuerySuggestions(tabTitle: string, currentDomain: string = '') {
@@ -1240,7 +1169,7 @@ class MozAIMode extends LitElement {
       })
       const activeTab = tabs[0]
 
-      const detectedType = this.detectQueryType(queryToSubmit)
+      const detectedType = detectQueryType(queryToSubmit)
 
       // Handle different query types
       if (detectedType === 'navigate') {
@@ -2033,7 +1962,7 @@ ${pageContent.slice(0, 4000)}`
                               this.handleSuggestionHover(index)}"
                           >
                             <span class="suggestion-icon"
-                              >${this.getQueryTypeIcon(suggestion.type)}</span
+                              >${getQueryTypeIcon(suggestion.type)}</span
                             >
                             <span class="suggestion-text"
                               >${suggestion.text}</span
@@ -2185,7 +2114,7 @@ ${pageContent.slice(0, 4000)}`
                 >
                   ${this.aiResponse || this.currentChatId
                     ? '💬 Ask'
-                    : `${this.getQueryTypeIcon(this.detectQueryType(this.query))} ${this.getQueryTypeLabel(this.detectQueryType(this.query))}`}
+                    : `${getQueryTypeIcon(detectQueryType(this.query))} ${getQueryTypeLabel(detectQueryType(this.query))}`}
                 </button>
               </div>
             </div>

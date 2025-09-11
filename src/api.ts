@@ -4,6 +4,7 @@ import type {
   TabsCollectionT,
   UrlbarSuggestionT,
 } from '../types'
+import { customView } from './features/aimode/utils'
 
 declare const ChromeUtils: any
 declare const ExtensionAPI: any
@@ -369,6 +370,25 @@ export default class extends ExtensionAPI {
             if (enabled) {
               if (urlbarFocusEnabled) return true
 
+              // Replace FirefoxViewHandler.openTab with custom function
+              if (
+                window.FirefoxViewHandler &&
+                window.FirefoxViewHandler.openTab
+              ) {
+                // Store original function
+                if (!window.FirefoxViewHandler._originalOpenTab) {
+                  window.FirefoxViewHandler._originalOpenTab =
+                    window.FirefoxViewHandler.openTab
+                }
+                // Replace with custom function
+                window.FirefoxViewHandler.openTab = () =>
+                  customView(window, context, this)
+              }
+
+              // Point new tab to AI mode page
+              lazy.AboutNewTab.newTabURL =
+                context.extension.baseURL + 'pages/aiModePage.html'
+
               // Apply AI mode UI changes
               const urlbarElement = window.document.getElementById('urlbar')
               if (urlbarElement) {
@@ -421,6 +441,19 @@ export default class extends ExtensionAPI {
               urlbarFocusEnabled = true
             } else {
               if (!urlbarFocusEnabled) return true
+
+              // Restore FirefoxViewHandler.openTab
+              if (
+                window.FirefoxViewHandler &&
+                window.FirefoxViewHandler._originalOpenTab
+              ) {
+                window.FirefoxViewHandler.openTab =
+                  window.FirefoxViewHandler._originalOpenTab
+                window.FirefoxViewHandler._originalOpenTab = null
+              }
+
+              // Restore new tab behavior
+              lazy.AboutNewTab.resetNewTabURL()
 
               // Restore original UI
               const urlbarElement = window.document.getElementById('urlbar')
