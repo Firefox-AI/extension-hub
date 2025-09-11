@@ -4,6 +4,7 @@ import {
   getOpenAIChatResponseWithModel,
   OpenAIKeyManager,
 } from '../../services/openai'
+import type { mlBrowserT } from '../../../types'
 
 class MozAIModePage extends LitElement {
   query: string = ''
@@ -31,6 +32,7 @@ class MozAIModePage extends LitElement {
     super.connectedCallback()
     this.initializeOpenAIKeyStatus()
     this.checkForHashQuery()
+    this.closeSidebar()
   }
 
   disconnectedCallback() {
@@ -67,6 +69,14 @@ class MozAIModePage extends LitElement {
           }
         }, 100)
       }
+    }
+  }
+
+  async closeSidebar() {
+    try {
+      await (browser as any as mlBrowserT).extensionHub.closeSidebar()
+    } catch (error) {
+      console.log('Sidebar already closed or not available:', error)
     }
   }
 

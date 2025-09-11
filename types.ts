@@ -31,8 +31,12 @@ export type mlBrowserT = {
     getBoolPref: (prefName: string) => Promise<boolean>
     findInPage: (query: string) => Promise<boolean>
     getUrlbarSuggestions: (searchString: string) => Promise<UrlbarSuggestionT[]>
+    setUrlbarRedirect: (enabled: boolean) => Promise<boolean>
+    setNewTabOverride: (enabled: boolean) => Promise<boolean>
+    setFirefoxViewOverride: (enabled: boolean) => Promise<boolean>
     updateUIForAIMode: (enabled: boolean) => Promise<boolean>
     getLastFocusedUrl: () => Promise<string | null>
+    closeSidebar: () => Promise<boolean>
   }
   trial?: {
     ml: {

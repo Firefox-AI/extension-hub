@@ -106,6 +106,8 @@ class MozAIMode extends LitElement {
     favicon: string
   }> = []
   redirectUrlbarToSidebar: boolean = false
+  overrideNewTab: boolean = false
+  overrideFirefoxView: boolean = false
 
   static get properties() {
     return {
@@ -131,6 +133,8 @@ class MozAIMode extends LitElement {
       selectedTabs: { type: Array },
       availableTabs: { type: Array },
       redirectUrlbarToSidebar: { type: Boolean },
+      overrideNewTab: { type: Boolean },
+      overrideFirefoxView: { type: Boolean },
     }
   }
 
@@ -160,16 +164,28 @@ class MozAIMode extends LitElement {
     await this.updateCurrentTabInfo()
     await this.loadPersonalInsightsPreference()
     await this.loadUrlbarRedirectPreference()
+    await this.loadNewTabOverridePreference()
+    await this.loadFirefoxViewOverridePreference()
     await this.initializeCurrentTabInSelectedList()
 
     // Focus the input box by default
     this.focusInputBox()
 
-    // If urlbar redirect is already enabled, activate the AI mode UI
+    // If any AI mode settings are enabled, activate the corresponding UI
     if (this.redirectUrlbarToSidebar) {
-      await (browser as unknown as mlBrowserT).extensionHub.updateUIForAIMode(
+      await (browser as unknown as mlBrowserT).extensionHub.setUrlbarRedirect(
         true,
       )
+    }
+    if (this.overrideNewTab) {
+      await (browser as unknown as mlBrowserT).extensionHub.setNewTabOverride(
+        true,
+      )
+    }
+    if (this.overrideFirefoxView) {
+      await (
+        browser as unknown as mlBrowserT
+      ).extensionHub.setFirefoxViewOverride(true)
     }
   }
 
@@ -268,6 +284,30 @@ class MozAIMode extends LitElement {
       this.requestUpdate()
     } catch (error) {
       console.error('Error loading urlbar redirect preference:', error)
+    }
+  }
+
+  async loadNewTabOverridePreference() {
+    try {
+      const { ai_mode_new_tab_override } = await browser.storage.local.get([
+        'ai_mode_new_tab_override',
+      ])
+      this.overrideNewTab = ai_mode_new_tab_override || false
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Error loading new tab override preference:', error)
+    }
+  }
+
+  async loadFirefoxViewOverridePreference() {
+    try {
+      const { ai_mode_firefox_view_override } = await browser.storage.local.get(
+        ['ai_mode_firefox_view_override'],
+      )
+      this.overrideFirefoxView = ai_mode_firefox_view_override || false
+      this.requestUpdate()
+    } catch (error) {
+      console.error('Error loading Firefox View override preference:', error)
     }
   }
 
@@ -1181,10 +1221,52 @@ ${pageContent.slice(0, 4000)}`
       console.error('Error saving urlbar redirect preference:', error)
     }
 
-    // Update UI for AI mode based on the new state
-    await (browser as unknown as mlBrowserT).extensionHub.updateUIForAIMode(
+    // Update UI for urlbar redirect based on the new state
+    await (browser as unknown as mlBrowserT).extensionHub.setUrlbarRedirect(
       this.redirectUrlbarToSidebar,
     )
+
+    this.showMenu = false
+    this.requestUpdate()
+  }
+
+  async handleNewTabOverrideToggle() {
+    this.overrideNewTab = !this.overrideNewTab
+
+    // Save preference
+    try {
+      await browser.storage.local.set({
+        ai_mode_new_tab_override: this.overrideNewTab,
+      })
+    } catch (error) {
+      console.error('Error saving new tab override preference:', error)
+    }
+
+    // Update UI for new tab override based on the new state
+    await (browser as unknown as mlBrowserT).extensionHub.setNewTabOverride(
+      this.overrideNewTab,
+    )
+
+    this.showMenu = false
+    this.requestUpdate()
+  }
+
+  async handleFirefoxViewOverrideToggle() {
+    this.overrideFirefoxView = !this.overrideFirefoxView
+
+    // Save preference
+    try {
+      await browser.storage.local.set({
+        ai_mode_firefox_view_override: this.overrideFirefoxView,
+      })
+    } catch (error) {
+      console.error('Error saving Firefox View override preference:', error)
+    }
+
+    // Update UI for Firefox View override based on the new state
+    await (
+      browser as unknown as mlBrowserT
+    ).extensionHub.setFirefoxViewOverride(this.overrideFirefoxView)
 
     this.showMenu = false
     this.requestUpdate()
@@ -1345,7 +1427,7 @@ ${pageContent.slice(0, 4000)}`
                       </div>
 
                       <div class="menu-section">
-                        <div class="menu-section-title">URL Bar</div>
+                        <div class="menu-section-title">AI Mode Overrides</div>
                         <button
                           class="menu-item ${this.redirectUrlbarToSidebar
                             ? 'active'
@@ -1353,7 +1435,25 @@ ${pageContent.slice(0, 4000)}`
                           @click="${this.handleUrlbarRedirectToggle}"
                         >
                           <span class="menu-icon">🔗</span>
-                          Redirect Focus to Sidebar
+                          Redirect URL Bar Focus
+                        </button>
+                        <button
+                          class="menu-item ${this.overrideNewTab
+                            ? 'active'
+                            : ''}"
+                          @click="${this.handleNewTabOverrideToggle}"
+                        >
+                          <span class="menu-icon">📄</span>
+                          Override New Tab Page
+                        </button>
+                        <button
+                          class="menu-item ${this.overrideFirefoxView
+                            ? 'active'
+                            : ''}"
+                          @click="${this.handleFirefoxViewOverrideToggle}"
+                        >
+                          <span class="menu-icon">🦊</span>
+                          Override Firefox View
                         </button>
                       </div>
 

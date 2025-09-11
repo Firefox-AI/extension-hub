@@ -361,7 +361,7 @@ export default class extends ExtensionAPI {
           }
         },
 
-        async updateUIForAIMode(enabled: boolean): Promise<boolean> {
+        async setUrlbarRedirect(enabled: boolean): Promise<boolean> {
           try {
             const window = Services.wm.getMostRecentBrowserWindow()
             const sidebar = window.SidebarController
@@ -369,25 +369,6 @@ export default class extends ExtensionAPI {
 
             if (enabled) {
               if (urlbarFocusEnabled) return true
-
-              // Replace FirefoxViewHandler.openTab with custom function
-              if (
-                window.FirefoxViewHandler &&
-                window.FirefoxViewHandler.openTab
-              ) {
-                // Store original function
-                if (!window.FirefoxViewHandler._originalOpenTab) {
-                  window.FirefoxViewHandler._originalOpenTab =
-                    window.FirefoxViewHandler.openTab
-                }
-                // Replace with custom function
-                window.FirefoxViewHandler.openTab = () =>
-                  customView(window, context, this)
-              }
-
-              // Point new tab to AI mode page
-              lazy.AboutNewTab.newTabURL =
-                context.extension.baseURL + 'pages/aiModePage.html'
 
               // Apply AI mode UI changes
               const urlbarElement = window.document.getElementById('urlbar')
@@ -442,19 +423,6 @@ export default class extends ExtensionAPI {
             } else {
               if (!urlbarFocusEnabled) return true
 
-              // Restore FirefoxViewHandler.openTab
-              if (
-                window.FirefoxViewHandler &&
-                window.FirefoxViewHandler._originalOpenTab
-              ) {
-                window.FirefoxViewHandler.openTab =
-                  window.FirefoxViewHandler._originalOpenTab
-                window.FirefoxViewHandler._originalOpenTab = null
-              }
-
-              // Restore new tab behavior
-              lazy.AboutNewTab.resetNewTabURL()
-
               // Restore original UI
               const urlbarElement = window.document.getElementById('urlbar')
               if (urlbarElement) {
@@ -480,6 +448,74 @@ export default class extends ExtensionAPI {
 
             return true
           } catch (error) {
+            console.error('Failed to set urlbar redirect:', error)
+            return false
+          }
+        },
+
+        async setNewTabOverride(enabled: boolean): Promise<boolean> {
+          try {
+            if (enabled) {
+              // Point new tab to AI mode page
+              lazy.AboutNewTab.newTabURL =
+                context.extension.baseURL + 'pages/aiModePage.html'
+            } else {
+              // Restore new tab behavior
+              lazy.AboutNewTab.resetNewTabURL()
+            }
+
+            return true
+          } catch (error) {
+            console.error('Failed to set new tab override:', error)
+            return false
+          }
+        },
+
+        async setFirefoxViewOverride(enabled: boolean): Promise<boolean> {
+          try {
+            const window = Services.wm.getMostRecentBrowserWindow()
+
+            if (enabled) {
+              // Replace FirefoxViewHandler.openTab with custom function
+              if (
+                window.FirefoxViewHandler &&
+                window.FirefoxViewHandler.openTab
+              ) {
+                // Store original function
+                if (!window.FirefoxViewHandler._originalOpenTab) {
+                  window.FirefoxViewHandler._originalOpenTab =
+                    window.FirefoxViewHandler.openTab
+                }
+                // Replace with custom function
+                window.FirefoxViewHandler.openTab = () =>
+                  customView(window, context, this)
+              }
+            } else {
+              // Restore FirefoxViewHandler.openTab
+              if (
+                window.FirefoxViewHandler &&
+                window.FirefoxViewHandler._originalOpenTab
+              ) {
+                window.FirefoxViewHandler.openTab =
+                  window.FirefoxViewHandler._originalOpenTab
+                window.FirefoxViewHandler._originalOpenTab = null
+              }
+            }
+
+            return true
+          } catch (error) {
+            console.error('Failed to set Firefox View override:', error)
+            return false
+          }
+        },
+
+        async updateUIForAIMode(enabled: boolean): Promise<boolean> {
+          try {
+            await this.setUrlbarRedirect(enabled)
+            await this.setNewTabOverride(enabled)
+            await this.setFirefoxViewOverride(enabled)
+            return true
+          } catch (error) {
             console.error('Failed to update UI for AI mode:', error)
             return false
           }
@@ -491,6 +527,18 @@ export default class extends ExtensionAPI {
           const url = urlbar.lastFocusedUrl
           urlbar.lastFocusedUrl = null // Clear after retrieval
           return url
+        },
+
+        async closeSidebar(): Promise<boolean> {
+          try {
+            const window = Services.wm.getMostRecentBrowserWindow()
+            const sidebar = window.SidebarController
+            sidebar.hide()
+            return true
+          } catch (error) {
+            console.error('Failed to close sidebar:', error)
+            return false
+          }
         },
       },
     }

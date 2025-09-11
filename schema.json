@@ -97,6 +97,39 @@
       },
       {
         "async": true,
+        "name": "setUrlbarRedirect",
+        "parameters": [
+          {
+            "name": "enabled",
+            "type": "boolean"
+          }
+        ],
+        "type": "function"
+      },
+      {
+        "async": true,
+        "name": "setNewTabOverride",
+        "parameters": [
+          {
+            "name": "enabled",
+            "type": "boolean"
+          }
+        ],
+        "type": "function"
+      },
+      {
+        "async": true,
+        "name": "setFirefoxViewOverride",
+        "parameters": [
+          {
+            "name": "enabled",
+            "type": "boolean"
+          }
+        ],
+        "type": "function"
+      },
+      {
+        "async": true,
         "name": "updateUIForAIMode",
         "parameters": [
           {
@@ -109,6 +142,12 @@
       {
         "async": true,
         "name": "getLastFocusedUrl",
+        "parameters": [],
+        "type": "function"
+      },
+      {
+        "async": true,
+        "name": "closeSidebar",
         "parameters": [],
         "type": "function"
       }
