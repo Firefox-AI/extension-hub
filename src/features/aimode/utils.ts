@@ -1008,9 +1008,18 @@ export function customView(
         })
         break
       case 'chat':
+        // Open AI mode page for chat queries with the query as hash parameter
+        const chatUrl =
+          context.extension.baseURL +
+          'pages/aiModePage.html#' +
+          encodeURIComponent(query)
+        window.gBrowser.selectedTab = window.gBrowser.addTrustedTab(chatUrl, {
+          triggeringPrincipal: context.extension.principal,
+        })
+        break
       case 'action':
       default:
-        // Open AI mode page for chat/action queries
+        // Open AI mode page for action queries
         const aiModeUrl = context.extension.baseURL + 'pages/aiModePage.html'
         window.gBrowser.selectedTab = window.gBrowser.addTrustedTab(aiModeUrl, {
           triggeringPrincipal: context.extension.principal,

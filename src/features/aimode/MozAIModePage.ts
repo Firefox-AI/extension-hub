@@ -30,6 +30,7 @@ class MozAIModePage extends LitElement {
   connectedCallback() {
     super.connectedCallback()
     this.initializeOpenAIKeyStatus()
+    this.checkForHashQuery()
   }
 
   disconnectedCallback() {
@@ -47,6 +48,26 @@ class MozAIModePage extends LitElement {
     // Get initial key status
     this.hasOpenAIKey = await OpenAIKeyManager.checkOpenAIKey()
     this.requestUpdate()
+  }
+
+  async checkForHashQuery() {
+    // Check if there's a query in the URL hash
+    const hash = window.location.hash
+    if (hash && hash.startsWith('#')) {
+      const query = decodeURIComponent(hash.substring(1)).trim()
+      if (query) {
+        this.query = query
+        this.requestUpdate()
+
+        // Auto-start the AI response if we have an OpenAI key
+        // Wait a bit for the key status to be loaded
+        setTimeout(async () => {
+          if (this.hasOpenAIKey) {
+            await this.handleAIResponse()
+          }
+        }, 100)
+      }
+    }
   }
 
   createRenderRoot() {
