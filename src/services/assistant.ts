@@ -2,7 +2,7 @@
 
 import { LocalStorageKeys } from '../../const'
 import OpenAI from 'openai'
-import { assistantTools, get_page_contents, get_insights, search_history, get_tabs, get_current_tab } from './assistant-tools'
+import { assistantTools, get_page_contents, get_insights, search_history, get_tabs, get_current_tab } from './assistantTools'
 
 
 export type ChatRole = 'system' | 'user' | 'assistant' | 'tool'
@@ -64,7 +64,7 @@ export class AssistantStore {
 
 export class AssistantService {
   private client?: OpenAI
-  private modelId: string = 'qwen3-235b-a22b-instruct'
+  private modelId: string = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
 
   async initialize() {
     const { togetherai_api_key, togetherai_model } = await browser.storage.local.get([
@@ -105,7 +105,7 @@ export class AssistantService {
       })
       const result = await Promise.race([
         request,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('request-timeout')), 30000)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('request-timeout')), 15000)),
       ]).catch((err) => {
         console.warn('[assistant] Together request failed:', err)
         return undefined
