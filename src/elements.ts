@@ -13,6 +13,7 @@ import MozSemanticSearch from './features/MozSemanticSearch'
 import MozTabs from './features/MozTabs'
 import MozTabsDebug from './features/MozTabsDebug'
 import MozMentionInput from './components/MozMentionInput'
+import MozAssistantChat from './features/assistant/MozAssistantChat'
 
 customElements.define('moz-ai-mode', MozAIMode)
 customElements.define('moz-attribute-comparison', MozAttributeComparison)
@@ -32,3 +33,4 @@ customElements.define('moz-semantic-search', MozSemanticSearch)
 customElements.define('moz-tabs-debug', MozTabsDebug)
 customElements.define('moz-tabs', MozTabs)
 customElements.define('moz-mention-input', MozMentionInput)
+customElements.define('moz-assistant-chat', MozAssistantChat)

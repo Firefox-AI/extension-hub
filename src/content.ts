@@ -64,6 +64,23 @@ const getPageContent = (): PageContentT | null => {
   return payload
 }
 
+/**
+ * Get basic page metadata including the meta description when available.
+ */
+const getPageMetadata = () => {
+  const metaDesc =
+    document.querySelector('meta[name="description"]')?.getAttribute('content') ||
+    document
+      .querySelector('meta[property="og:description"]')
+      ?.getAttribute('content') ||
+    ''
+  return {
+    description: metaDesc,
+    title: document.title,
+    url: window.location.href,
+  }
+}
+
 // Handle messages from background script
 browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   console.log('HERE')
@@ -72,6 +89,10 @@ browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'get_page_content') {
     sendResponse(getPageContent())
     return true // indicate async response
+  }
+  if (msg.type === 'get_page_metadata') {
+    sendResponse(getPageMetadata())
+    return true
   }
 })
 

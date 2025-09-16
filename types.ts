@@ -62,6 +62,15 @@ export type mlBrowserT = {
   }
 }
 
+export type ToolDefinition = {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters: any
+  }
+}
+
 export type MessageTypesT =
   | 'page_qa'
   | 'page_qa_result'
@@ -174,6 +183,7 @@ export type RunEngineMetadataT = {
   prompt?: PromptT[]
   nPredict?: number
   skipPrompt?: boolean
+  tools?: ToolDefinition[]
 }
 
 export type MessagePageAssistT = {
