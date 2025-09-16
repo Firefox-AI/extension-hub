@@ -3,7 +3,7 @@ import { FeatureViewStyles } from '../FeatureViewStyles'
 import { assistantStore } from '../../services/assistant'
 import { sendAndAppend } from '../../services/assistantConversation'
 import TinyMark from '../../services/tinyMark'
-import { getQuickPrompts } from '../../services/assistantQuickPrompts'
+import { getQuickPrompts, getQuickPromptsInConversation } from '../../services/assistantQuickPrompts'
 
 class MozAssistantChat extends LitElement {
   messages: { role: string; content: string }[] = []
@@ -67,6 +67,17 @@ class MozAssistantChat extends LitElement {
       this.messages = assistantStore.getAll()
       if (this.messages.length > 0) this.quickPrompts = []
       this.loading = false
+      // After assistant response, fetch in-conversation quick prompts
+      try {
+        const last = [...this.messages].reverse().find((m) => m.role === 'assistant')
+        const isSearchButton = last && typeof last.content === 'string' && last.content.startsWith('SEARCH_BUTTON:')
+        if (!isSearchButton) {
+          const next = await getQuickPromptsInConversation(this.messages, 2)
+          this.quickPrompts = next
+        }
+      } catch (e) {
+        console.warn('[assistant][quick-prompts] in-convo generation failed:', e)
+      }
       this.updateComplete.then(() => this.scrollToBottom())
     }
   }
@@ -117,7 +128,7 @@ class MozAssistantChat extends LitElement {
               : ''}
           </div>
 
-          ${this.quickPrompts.length && this.messages.length === 0
+          ${this.quickPrompts.length
             ? html`<div class="suggestions">
                 ${this.quickPrompts.map(
                   (s) =>

@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { LocalStorageKeys } from '../../const'
 import { get_current_tab, get_tabs, get_insights } from './assistantTools'
+import type { ChatMessage } from './assistant'
 
 const QUICK_PROMPT_SUGGEST_TEMPLATE = `You are an expert in inferring what a browser user wants to do based on their current browser context and you are provided with the following:
 
@@ -134,6 +135,129 @@ export async function getQuickPrompts(n: number = 2): Promise<string[]> {
     return Array.from(new Set(guesses)).slice(0, n)
   } catch (e) {
     console.warn('[assistant][quick-prompts] failed:', e)
+    return []
+  }
+}
+
+// --- In-conversation quick prompts ---
+
+const QUICK_PROMPT_IN_CONVO_TEMPLATE = `You are an expert suggesting next actions for a browser assistant user.
+
+========
+Current Tab:
+{current_tab}
+
+========
+Conversation History (latest last):
+{conversation}
+
+========
+Generate {n} suggested next queries that the user might ask next.
+- Keep each under 12 words and conversational.
+- Stay relevant to the current tab and recent assistant replies.
+- Do not repeat earlier user queries verbatim.
+- Provide diverse and helpful directions based on the above.
+`
+
+function trimConversation(history: ChatMessage[]): Array<{ role: 'user' | 'assistant'; content: string }> {
+  // Keep only natural user/assistant messages; drop tool calls and tool outputs.
+  const out: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  for (const m of history) {
+    if ((m.role === 'user' || m.role === 'assistant') && m.content && m.content.trim()) {
+      // skip assistant messages that only carry tool_calls and have empty content
+      if (m.role === 'assistant' && (!m.content.trim() || m.content.trim() === '')) continue
+      out.push({ role: m.role, content: m.content })
+    }
+  }
+  // Optionally cap the context to last ~10 messages for brevity
+  return out.slice(-10)
+}
+
+export async function getQuickPromptsInConversation(history: ChatMessage[], n: number = 2): Promise<string[]> {
+  try {
+    const tab = await get_current_tab({})
+    const convo = trimConversation(history)
+
+    const filled = QUICK_PROMPT_IN_CONVO_TEMPLATE
+      .replace('{current_tab}', JSON.stringify(tab))
+      .replace('{conversation}', JSON.stringify(convo))
+      .replace('{n}', String(n))
+
+    const { togetherai_api_key, togetherai_model } = await browser.storage.local.get([
+      LocalStorageKeys.TOGETHERAI_API_KEY,
+      LocalStorageKeys.TOGETHERAI_MODEL,
+    ])
+
+    const client = new OpenAI({
+      apiKey: togetherai_api_key || '',
+      dangerouslyAllowBrowser: true,
+      baseURL: 'https://api.together.xyz/v1',
+    })
+
+    const QUICK_PROMPTS_SCHEMA = {
+      title: 'QuickPrompts',
+      type: 'object',
+      required: ['prompts'],
+      properties: {
+        prompts: {
+          title: 'Prompts',
+          description: 'A list of suggested quick prompts for browsing.',
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+    }
+
+    const result = await Promise.race([
+      client.chat.completions.create({
+        model: togetherai_model || 'qwen3-235b-a22b-instruct',
+        messages: [
+          { role: 'system', content: 'Return only valid JSON that matches the provided schema.' },
+          { role: 'user', content: filled },
+        ],
+        // @ts-ignore Together supports json schema
+        response_format: { type: 'json_object', schema: QUICK_PROMPTS_SCHEMA },
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('qp-timeout')), 15000)),
+    ])
+
+    const text = (result as any).choices?.[0]?.message?.content?.trim() || ''
+    try {
+      const obj = JSON.parse(text)
+      if (obj && Array.isArray(obj.prompts)) {
+        return obj.prompts.map((s: any) => String(s)).slice(0, n)
+      }
+    } catch {}
+
+    // Fallbacks (reuse logic from getQuickPrompts)
+    try {
+      const parsed = JSON.parse(text)
+      if (Array.isArray(parsed)) return parsed.map((s) => String(s)).slice(0, n)
+    } catch {}
+
+    const arrays: string[] = []
+    const arrayMatches = text.match(/\[[\s\S]*?\]/g) || []
+    for (const m of arrayMatches) {
+      try {
+        const arr = JSON.parse(m)
+        if (Array.isArray(arr)) arrays.push(...arr.map((s: any) => String(s)))
+      } catch {}
+    }
+    if (arrays.length) return Array.from(new Set(arrays)).slice(0, n)
+
+    const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+    const guesses: string[] = []
+    for (const line of lines) {
+      const qm = line.match(/\"([^\"]+)\"/) || line.match(/'([^']+)'/)
+      if (qm && qm[1]) guesses.push(qm[1])
+      else {
+        const cleaned = line.replace(/^[-*\d.\s]+/, '').replace(/^\[|\]$/g, '')
+        if (cleaned) guesses.push(cleaned)
+      }
+    }
+    return Array.from(new Set(guesses)).slice(0, n)
+  } catch (e) {
+    console.warn('[assistant][quick-prompts][in-convo] failed:', e)
     return []
   }
 }
