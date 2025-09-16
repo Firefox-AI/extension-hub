@@ -23,7 +23,7 @@ export class MlEngineService {
       SessionStorageKeys.ENGINE_CREATED
     )
 
-    console.log('Trying to creating ML Engine...')
+    console.log('Trying to create ML Engine...')
     console.log('Engine has already been created:', Boolean(engine_created))
 
     if (engine_created) {
@@ -61,7 +61,7 @@ export class MlEngineService {
 
       this.engineCreated = true
     } catch (err) {
-      console.error('Error creating ML Engin:', err)
+      console.error('Error creating ML Engine:', err)
     }
   }
 
