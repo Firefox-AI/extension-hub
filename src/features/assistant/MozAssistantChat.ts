@@ -48,8 +48,12 @@ class MozAssistantChat extends LitElement {
   async handleSend(textOverride?: string) {
     const text = (textOverride ?? this.inputValue).trim()
     if (!text || this.loading) return
+    // Optimistically render the user's message immediately
+    this.messages = [...this.messages, { role: 'user', content: text }]
     this.loading = true
     if (!textOverride) this.inputValue = ''
+    // Hide suggestions once the user starts typing/sending
+    if (this.messages.length > 0) this.quickPrompts = []
     try {
       await sendAndAppend(text)
     } catch (err) {
