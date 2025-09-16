@@ -3,23 +3,32 @@ import { FeatureViewStyles } from '../FeatureViewStyles'
 import { assistantStore } from '../../services/assistant'
 import { sendAndAppend } from '../../services/assistantConversation'
 import TinyMark from '../../services/tinyMark'
+import { getQuickPrompts } from '../../services/assistantQuickPrompts'
 
 class MozAssistantChat extends LitElement {
   messages: { role: string; content: string }[] = []
   inputValue: string = ''
   loading: boolean = false
   tinyMark: TinyMark
+  quickPrompts: string[] = []
+  private boundOnActivated?: () => void
+  private boundOnUpdated?: (tabId: number, changeInfo: any) => void
 
   static properties = {
     messages: { type: Array },
     inputValue: { type: String },
     loading: { type: Boolean },
     tinyMark: { type: Object },
+    quickPrompts: { type: Array },
   }
 
   connectedCallback() {
     super.connectedCallback()
     this.init()
+    this.boundOnActivated = () => this.onTabEvent()
+    this.boundOnUpdated = (tabId: number, changeInfo: any) => this.onTabUpdated(tabId, changeInfo)
+    browser.tabs.onActivated.addListener(this.boundOnActivated)
+    browser.tabs.onUpdated.addListener(this.boundOnUpdated)
   }
 
   constructor() {
@@ -30,13 +39,17 @@ class MozAssistantChat extends LitElement {
   async init() {
     await assistantStore.load()
     this.messages = assistantStore.getAll()
+    // Preload up to 2 suggestions only if no conversation yet
+    if (this.messages.length === 0) {
+      this.quickPrompts = await getQuickPrompts(2)
+    }
   }
 
-  async handleSend() {
-    const text = this.inputValue.trim()
+  async handleSend(textOverride?: string) {
+    const text = (textOverride ?? this.inputValue).trim()
     if (!text || this.loading) return
     this.loading = true
-    this.inputValue = ''
+    if (!textOverride) this.inputValue = ''
     try {
       await sendAndAppend(text)
     } catch (err) {
@@ -48,6 +61,7 @@ class MozAssistantChat extends LitElement {
       ]
     } finally {
       this.messages = assistantStore.getAll()
+      if (this.messages.length > 0) this.quickPrompts = []
       this.loading = false
       this.updateComplete.then(() => this.scrollToBottom())
     }
@@ -69,6 +83,7 @@ class MozAssistantChat extends LitElement {
     this.messages = []
     this.inputValue = ''
     assistantStore.clear()
+    this.refreshQuickPrompts()
   }
 
   render() {
@@ -97,6 +112,21 @@ class MozAssistantChat extends LitElement {
               ? html`<div class="loading">Thinking…</div>`
               : ''}
           </div>
+
+          ${this.quickPrompts.length && this.messages.length === 0
+            ? html`<div class="suggestions">
+                ${this.quickPrompts.map(
+                  (s) =>
+                    html`<button
+                      class="suggestion"
+                      title=${s}
+                      @click=${() => this.handleSend(s)}
+                    >
+                      ${s}
+                    </button>`,
+                )}
+              </div>`
+            : ''}
 
           <textarea
             .value=${this.inputValue}
@@ -152,6 +182,20 @@ class MozAssistantChat extends LitElement {
       textarea { resize: none; padding: 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-input-bg); color: var(--color-fg); margin: 12px 0; }
       .footer { display: flex; justify-content: flex-end; gap: 8px; }
       .loading { color: var(--color-fg-subtle); font-style: italic; }
+      .suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+      .suggestion {
+        max-width: 100%;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        cursor: pointer;
+        background: #0ea5e9;
+        color: #fff;
+        border: 1px solid #0284c7;
+        border-radius: 9999px;
+        padding: 6px 10px;
+      }
+      .suggestion:hover { background: #0284c7; }
       .link-button {
         cursor: pointer;
         border: 1px solid #15803d; /* dark green */
@@ -166,6 +210,29 @@ class MozAssistantChat extends LitElement {
       }
     `,
   ]
+  
+
+  private onTabEvent() {
+    this.refreshQuickPrompts()
   }
+
+  private onTabUpdated(_tabId: number, changeInfo: any) {
+    if (changeInfo?.status === 'complete' || changeInfo?.url) {
+      this.refreshQuickPrompts()
+    }
+  }
+
+  private async refreshQuickPrompts() {
+    if (this.messages.length === 0) {
+      this.quickPrompts = await getQuickPrompts(2)
+    }
+  }
+
+  disconnectedCallback(): void {
+    if (this.boundOnActivated) browser.tabs.onActivated.removeListener(this.boundOnActivated)
+    if (this.boundOnUpdated) browser.tabs.onUpdated.removeListener(this.boundOnUpdated)
+    super.disconnectedCallback()
+  }
+}
 
 export default MozAssistantChat
