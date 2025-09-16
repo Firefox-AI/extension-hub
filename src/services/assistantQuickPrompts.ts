@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import { LocalStorageKeys } from '../../const'
 import { get_current_tab, get_tabs, get_insights } from './assistantTools'
 
-const TEMPLATE = `You are an expert in inferring what a browser user wants to do based on their current browser context and you are provided with the following information:
+const TEMPLATE = `You are an expert in inferring what a browser user wants to do based on their current browser context and you are provided with the following:
 
 ========
 Current Tab:
@@ -17,15 +17,13 @@ User Insights:
 {insights}
 
 ========
-You are tasked with generating {n} quick actions that can assist the user to kick start with their chat or browsing activities.
+You are tasked with generating {n} quick actions that can assist the user to kick start a chat with the assistant.
 The suggested prompts should be:
 - concise and maximum 8 words,
 - makes logical sense,
 - must be only related to current tab if presents (ignoe user insights),
 - creative and diverse in content but related to user's current browsing context,
-- balance the suggestions between opened tabs context and user insights if both are available.
-
-Always respond as a list of strings strictly without any other characters.`
+- balance the suggestions between opened tabs context and user insights if both are available.`
 
 const formatJson = (obj: any) => {
   try {
@@ -64,6 +62,7 @@ export async function getQuickPrompts(n: number = 2): Promise<string[]> {
       client.chat.completions.create({
         model: togetherai_model || "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
         messages: [
+          { role: 'system', content: 'You must reply only a list of strings as response.' },
           { role: 'user', content: filled }
         ],
       }),
