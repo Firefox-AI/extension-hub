@@ -92,7 +92,7 @@ export class AssistantService {
     ])
 
     this.modelId = togetherai_model || this.modelId
-    initOpenAIClient({apiKey: togetherai_api_key, baseURL: togetherai_url || "https://api.together.xyz/v1" })
+    initOpenAIClient({apiKey: togetherai_api_key, baseURL: togetherai_url })
   }
 
   async send(messages: ChatMessage[]) {
