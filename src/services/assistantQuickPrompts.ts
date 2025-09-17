@@ -66,7 +66,7 @@ async function generateQuickPromptsFromPrompt(filled: string, n: number): Promis
     LocalStorageKeys.TOGETHERAI_MODEL,
   ])
 
-  initOpenAIClient({ apiKey: togetherai_api_key, baseURL: togetherai_url || 'https://api.together.xyz/v1' })
+  initOpenAIClient({ apiKey: togetherai_api_key, baseURL: togetherai_url })
 
   const QUICK_PROMPTS_SCHEMA = {
     title: 'QuickPrompts',
