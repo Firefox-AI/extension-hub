@@ -21,7 +21,8 @@ export function initOpenAIClient(
   opts: { apiKey: string; baseURL?: string },
   options?: { force?: boolean },
 ) {
-  if (clientSingleton && !options?.force) {}
+  if (clientSingleton && !options?.force) {
+  }
   clientSingleton = new OpenAI({
     apiKey: opts.apiKey,
     baseURL: opts.baseURL,
@@ -35,7 +36,9 @@ export function resetOpenAIClient() {
 
 export function getOpenAIClient(): OpenAI {
   if (!clientSingleton) {
-    throw new Error('OpenAI client is not initialized. Call initOpenAIClient first.')
+    throw new Error(
+      'OpenAI client is not initialized. Call initOpenAIClient first.',
+    )
   }
   return clientSingleton
 }
@@ -61,8 +64,13 @@ export async function chatComplete(params: {
   const result: any = await Promise.race([
     request,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('request-timeout')), params.timeoutMs ?? 15000),
+      setTimeout(
+        () => reject(new Error('request-timeout')),
+        params.timeoutMs ?? 15000,
+      ),
     ),
   ])
+
+  console.log('[openai] chatComplete result:', result)
   return result
 }

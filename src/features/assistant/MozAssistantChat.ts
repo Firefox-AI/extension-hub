@@ -3,10 +3,14 @@ import { FeatureViewStyles } from '../FeatureViewStyles'
 import { assistantStore } from '../../services/assistant'
 import { sendAndAppend } from '../../services/assistantConversation'
 import TinyMark from '../../services/tinyMark'
-import { getQuickPrompts, getQuickPromptsInConversation } from '../../services/assistantQuickPrompts'
+import {
+  getQuickPrompts,
+  getQuickPromptsInConversation,
+} from '../../services/assistantQuickPrompts'
+import { ChatMessage } from '../../../types'
 
 class MozAssistantChat extends LitElement {
-  messages: { role: string; content: string }[] = []
+  messages: ChatMessage[] = []
   inputValue: string = ''
   loading: boolean = false
   tinyMark: TinyMark
@@ -26,7 +30,8 @@ class MozAssistantChat extends LitElement {
     super.connectedCallback()
     this.init()
     this.boundOnActivated = () => this.onTabEvent()
-    this.boundOnUpdated = (tabId: number, changeInfo: any) => this.onTabUpdated(tabId, changeInfo)
+    this.boundOnUpdated = (tabId: number, changeInfo: any) =>
+      this.onTabUpdated(tabId, changeInfo)
     browser.tabs.onActivated.addListener(this.boundOnActivated)
     browser.tabs.onUpdated.addListener(this.boundOnUpdated)
   }
@@ -61,7 +66,10 @@ class MozAssistantChat extends LitElement {
       // surface an error message in the thread for visibility
       this.messages = [
         ...assistantStore.getAll(),
-        { role: 'assistant', content: 'Sorry, the request was aborted. Please try again.' },
+        {
+          role: 'assistant',
+          content: 'Sorry, the request was aborted. Please try again.',
+        },
       ]
     } finally {
       this.messages = assistantStore.getAll()
@@ -69,14 +77,22 @@ class MozAssistantChat extends LitElement {
       this.loading = false
       // After assistant response, fetch in-conversation quick prompts
       try {
-        const last = [...this.messages].reverse().find((m) => m.role === 'assistant')
-        const isSearchButton = last && typeof last.content === 'string' && last.content.startsWith('SEARCH_BUTTON:')
+        const last = [...this.messages]
+          .reverse()
+          .find((m) => m.role === 'assistant')
+        const isSearchButton =
+          last &&
+          typeof last.content === 'string' &&
+          last.content.startsWith('SEARCH_BUTTON:')
         if (!isSearchButton) {
           const next = await getQuickPromptsInConversation(this.messages, 2)
           this.quickPrompts = next
         }
       } catch (e) {
-        console.warn('[assistant][quick-prompts] in-convo generation failed:', e)
+        console.warn(
+          '[assistant][quick-prompts] in-convo generation failed:',
+          e,
+        )
       }
       this.updateComplete.then(() => this.scrollToBottom())
     }
@@ -106,9 +122,17 @@ class MozAssistantChat extends LitElement {
       if (text.startsWith('SEARCH_BUTTON:')) {
         const payload = text.substring('SEARCH_BUTTON:'.length)
         const [href, label] = payload.split('|')
-        return html`<button class="link-button" @click=${() => browser.tabs.create({ url: href })}>${label || 'Open search'}</button>`
+        return html`<button
+          class="link-button"
+          @click=${() => browser.tabs.create({ url: href })}
+        >
+          ${label || 'Open search'}
+        </button>`
       }
-      return html`<div class="text" .innerHTML=${this.tinyMark.parse(text)}></div>`
+      return html`<div
+        class="text"
+        .innerHTML=${this.tinyMark.parse(text)}
+      ></div>`
     }
     return html`
       <div class="wrapper">
@@ -116,16 +140,13 @@ class MozAssistantChat extends LitElement {
           <h3 class="title">Assistant</h3>
           <div class="chat-window">
             ${this.messages.map(
-              (m) => html`
-                <div class="bubble-wrapper ${m.role}">
-                  <div class="bubble ${m.role}">
-                    ${renderAssistantContent(m.content)}
-                  </div>
-                </div>`,
+              (m) => html` <div class="bubble-wrapper ${m.role}">
+                <div class="bubble ${m.role}">
+                  ${renderAssistantContent(m.content)}
+                </div>
+              </div>`,
             )}
-            ${this.loading
-              ? html`<div class="loading">Thinking…</div>`
-              : ''}
+            ${this.loading ? html`<div class="loading">Thinking…</div>` : ''}
           </div>
 
           ${this.quickPrompts.length
@@ -183,21 +204,68 @@ class MozAssistantChat extends LitElement {
         max-height: calc(100vh - 100px);
         display: flex;
         padding: 10px 14px;
-        background: linear-gradient(135deg, var(--color-gradient-start) 0%, var(--color-gradient-end) 100%);
+        background: linear-gradient(
+          135deg,
+          var(--color-gradient-start) 0%,
+          var(--color-gradient-end) 100%
+        );
         flex-direction: column;
         border-radius: 8px;
         font-size: 14px;
       }
-      .chat-window { flex: 1; overflow-y: auto; padding: 1rem; background: var(--color-response-bg); }
-      .bubble-wrapper { margin-bottom: 12px; }
-      .bubble-wrapper.user { display: flex; justify-content: flex-end; }
-      .bubble { max-width: 70%; padding: 0.6rem 1rem; border-radius: 1rem; line-height: 1.4; }
-      .bubble.user { background: var(--color-primary); color: #fff; border-bottom-right-radius: 0; }
-      .bubble.assistant { background: #e5e5ea; color: #000; border-bottom-left-radius: 0; }
-      textarea { resize: none; padding: 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-input-bg); color: var(--color-fg); margin: 12px 0; }
-      .footer { display: flex; justify-content: flex-end; gap: 8px; }
-      .loading { color: var(--color-fg-subtle); font-style: italic; }
-      .suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+      .chat-window {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        background: var(--color-response-bg);
+      }
+      .bubble-wrapper {
+        margin-bottom: 12px;
+      }
+      .bubble-wrapper.user {
+        display: flex;
+        justify-content: flex-end;
+      }
+      .bubble {
+        max-width: 70%;
+        padding: 0.6rem 1rem;
+        border-radius: 1rem;
+        line-height: 1.4;
+      }
+      .bubble.user {
+        background: var(--color-primary);
+        color: #fff;
+        border-bottom-right-radius: 0;
+      }
+      .bubble.assistant {
+        background: #e5e5ea;
+        color: #000;
+        border-bottom-left-radius: 0;
+      }
+      textarea {
+        resize: none;
+        padding: 8px;
+        border: 1px solid var(--color-border);
+        border-radius: 4px;
+        background: var(--color-input-bg);
+        color: var(--color-fg);
+        margin: 12px 0;
+      }
+      .footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .loading {
+        color: var(--color-fg-subtle);
+        font-style: italic;
+      }
+      .suggestions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 8px 0;
+      }
       .suggestion {
         max-width: 100%;
         white-space: nowrap;
@@ -210,7 +278,9 @@ class MozAssistantChat extends LitElement {
         border-radius: 9999px;
         padding: 6px 10px;
       }
-      .suggestion:hover { background: #0284c7; }
+      .suggestion:hover {
+        background: #0284c7;
+      }
       .link-button {
         cursor: pointer;
         border: 1px solid #15803d; /* dark green */
@@ -225,7 +295,6 @@ class MozAssistantChat extends LitElement {
       }
     `,
   ]
-  
 
   private onTabEvent() {
     this.refreshQuickPrompts()
@@ -244,8 +313,10 @@ class MozAssistantChat extends LitElement {
   }
 
   disconnectedCallback(): void {
-    if (this.boundOnActivated) browser.tabs.onActivated.removeListener(this.boundOnActivated)
-    if (this.boundOnUpdated) browser.tabs.onUpdated.removeListener(this.boundOnUpdated)
+    if (this.boundOnActivated)
+      browser.tabs.onActivated.removeListener(this.boundOnActivated)
+    if (this.boundOnUpdated)
+      browser.tabs.onUpdated.removeListener(this.boundOnUpdated)
     super.disconnectedCallback()
   }
 }

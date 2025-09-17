@@ -195,3 +195,13 @@ export type MessageSummarizeTabsT = {
   prompt: string
   textContent: string
 }
+
+export type ChatRole = 'system' | 'user' | 'assistant' | 'tool'
+
+export type ChatMessage = {
+  role: ChatRole
+  content: string
+  ts?: number
+  tool_call_id?: string
+  tool_calls?: any[]
+}

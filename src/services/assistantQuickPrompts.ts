@@ -1,7 +1,7 @@
 import { LocalStorageKeys } from '../../const'
 import { get_current_tab, get_tabs, get_insights } from './assistantTools'
 import { initOpenAIClient, chatComplete } from './utilsOpenAI'
-import type { ChatMessage } from './assistant'
+import { ChatMessage } from '../../types'
 
 const QUICK_PROMPT_TEMPLATE = `You are an expert in inferring what a browser user wants to do based on their current browser context and you are provided with the following:
 
@@ -59,12 +59,16 @@ const formatJson = (obj: any) => {
   }
 }
 
-async function generateQuickPromptsFromPrompt(filled: string, n: number): Promise<string[]> {
-  const { togetherai_url, togetherai_api_key, togetherai_model } = await browser.storage.local.get([
-    LocalStorageKeys.TOGETHERAI_URL,
-    LocalStorageKeys.TOGETHERAI_API_KEY,
-    LocalStorageKeys.TOGETHERAI_MODEL,
-  ])
+async function generateQuickPromptsFromPrompt(
+  filled: string,
+  n: number,
+): Promise<string[]> {
+  const { togetherai_url, togetherai_api_key, togetherai_model } =
+    await browser.storage.local.get([
+      LocalStorageKeys.TOGETHERAI_URL,
+      LocalStorageKeys.TOGETHERAI_API_KEY,
+      LocalStorageKeys.TOGETHERAI_MODEL,
+    ])
 
   initOpenAIClient({ apiKey: togetherai_api_key, baseURL: togetherai_url })
 
@@ -86,7 +90,10 @@ async function generateQuickPromptsFromPrompt(filled: string, n: number): Promis
     model: togetherai_model,
     // @ts-ignore
     messages: [
-      { role: 'system', content: 'Return only valid JSON that matches the provided schema.' },
+      {
+        role: 'system',
+        content: 'Return only valid JSON that matches the provided schema.',
+      },
       { role: 'user', content: filled },
     ] as any,
     response_format: { type: 'json_object', schema: QUICK_PROMPTS_SCHEMA },
@@ -119,7 +126,10 @@ async function generateQuickPromptsFromPrompt(filled: string, n: number): Promis
   }
   if (arrays.length) return Array.from(new Set(arrays)).slice(0, n)
   // 4) Fallback: extract quoted strings per line
-  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+  const lines = text
+    .split(/\n+/)
+    .map((l: string) => l.trim())
+    .filter(Boolean)
   const guesses: string[] = []
   for (const line of lines) {
     const qm = line.match(/\"([^\"]+)\"/) || line.match(/'([^']+)'/)
@@ -132,13 +142,23 @@ async function generateQuickPromptsFromPrompt(filled: string, n: number): Promis
   return Array.from(new Set(guesses)).slice(0, n)
 }
 
-function trimConversation(history: ChatMessage[]): Array<{ role: 'user' | 'assistant'; content: string }> {
+function trimConversation(
+  history: ChatMessage[],
+): Array<{ role: 'user' | 'assistant'; content: string }> {
   // Keep only natural user/assistant messages; drop tool calls and tool outputs.
   const out: Array<{ role: 'user' | 'assistant'; content: string }> = []
   for (const m of history) {
-    if ((m.role === 'user' || m.role === 'assistant') && m.content && m.content.trim()) {
+    if (
+      (m.role === 'user' || m.role === 'assistant') &&
+      m.content &&
+      m.content.trim()
+    ) {
       // skip assistant messages that only carry tool_calls and have empty content
-      if (m.role === 'assistant' && (!m.content.trim() || m.content.trim() === '')) continue
+      if (
+        m.role === 'assistant' &&
+        (!m.content.trim() || m.content.trim() === '')
+      )
+        continue
       out.push({ role: m.role, content: m.content })
     }
   }
@@ -155,8 +175,10 @@ export async function getQuickPrompts(n: number = 2): Promise<string[]> {
       get_insights({}),
     ])
 
-    const filled = QUICK_PROMPT_TEMPLATE
-      .replace('{current_tab}', formatJson(tab))
+    const filled = QUICK_PROMPT_TEMPLATE.replace(
+      '{current_tab}',
+      formatJson(tab),
+    )
       .replace('{opened_tabs}', formatJson(tabs))
       .replace('{insights}', formatJson(insights))
       .replace('{n}', String(n))
@@ -168,13 +190,18 @@ export async function getQuickPrompts(n: number = 2): Promise<string[]> {
   }
 }
 
-export async function getQuickPromptsInConversation(history: ChatMessage[], n: number = 2): Promise<string[]> {
+export async function getQuickPromptsInConversation(
+  history: ChatMessage[],
+  n: number = 2,
+): Promise<string[]> {
   try {
     const tab = await get_current_tab({})
     const convo = trimConversation(history)
 
-    const filled = QUICK_PROMPT_IN_CONVO_TEMPLATE
-      .replace('{current_tab}', JSON.stringify(tab))
+    const filled = QUICK_PROMPT_IN_CONVO_TEMPLATE.replace(
+      '{current_tab}',
+      JSON.stringify(tab),
+    )
       .replace('{conversation}', JSON.stringify(convo))
       .replace('{n}', String(n))
     return await generateQuickPromptsFromPrompt(filled, n)

@@ -1,5 +1,6 @@
-import { assistantService, assistantStore, ChatMessage } from './assistant'
+import { assistantService, assistantStore } from './assistant'
 import { get_current_tab } from './assistantTools'
+import { ChatMessage } from '../../types'
 
 export const defaultSystemPrompt = `You are a personal browser assistant, designed to assist the user in navigating the web. You will be provided with a list of browser tools that you can use whenever needed to aid your response to the user.
 

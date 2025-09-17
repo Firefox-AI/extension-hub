@@ -1,22 +1,23 @@
 import { LocalStorageKeys } from '../../const'
 import { initOpenAIClient, chatComplete } from './utilsOpenAI'
-import { assistantTools, get_page_contents, get_insights, search_history, get_tabs, get_current_tab } from './assistantTools'
-
-
-export type ChatRole = 'system' | 'user' | 'assistant' | 'tool'
-
-export type ChatMessage = {
-  role: ChatRole
-  content: string
-  ts?: number
-  tool_call_id?: string
-  tool_calls?: any[]
-}
+import {
+  assistantTools,
+  get_page_contents,
+  get_insights,
+  search_history,
+  get_tabs,
+  get_current_tab,
+} from './assistantTools'
+import { ChatMessage } from '../../types'
 
 export class AssistantStore {
   private static instance: AssistantStore | null = null
   private messages: ChatMessage[] = []
-  private tokenUsages: Array<{ prompt: number; completion: number; total: number }> = []
+  private tokenUsages: Array<{
+    prompt: number
+    completion: number
+    total: number
+  }> = []
 
   static getInstance() {
     if (!AssistantStore.instance) {
@@ -68,14 +69,20 @@ export class AssistantStore {
     return this.tokenUsages
   }
 
-  async addTokenUsage(usage: { prompt?: number; completion?: number; total?: number }) {
+  async addTokenUsage(usage: {
+    prompt?: number
+    completion?: number
+    total?: number
+  }) {
     const u = {
       prompt: usage.prompt ?? 0,
       completion: usage.completion ?? 0,
       total: usage.total ?? (usage.prompt ?? 0) + (usage.completion ?? 0),
     }
     this.tokenUsages = [...this.tokenUsages, u]
-    await browser.storage.local.set({ [LocalStorageKeys.CHAT_TOKENS]: this.tokenUsages })
+    await browser.storage.local.set({
+      [LocalStorageKeys.CHAT_TOKENS]: this.tokenUsages,
+    })
   }
 }
 
@@ -85,14 +92,17 @@ export class AssistantService {
   private modelId: string = 'Qwen/Qwen3-235B-A22B-Instruct-2507-tput'
 
   async initialize() {
-    const { togetherai_url, togetherai_api_key, togetherai_model } = await browser.storage.local.get([
-      LocalStorageKeys.TOGETHERAI_URL,
-      LocalStorageKeys.TOGETHERAI_API_KEY,
-      LocalStorageKeys.TOGETHERAI_MODEL,
-    ])
+    const { togetherai_url, togetherai_api_key, togetherai_model } =
+      await browser.storage.local.get([
+        LocalStorageKeys.TOGETHERAI_URL,
+        LocalStorageKeys.TOGETHERAI_API_KEY,
+        LocalStorageKeys.TOGETHERAI_MODEL,
+      ])
 
     this.modelId = togetherai_model || this.modelId
-    initOpenAIClient({apiKey: togetherai_api_key, baseURL: togetherai_url })
+    console.log('base url:', togetherai_url)
+    console.log('api key:', togetherai_api_key)
+    initOpenAIClient({ apiKey: togetherai_api_key, baseURL: togetherai_url })
   }
 
   async send(messages: ChatMessage[]) {
@@ -111,7 +121,10 @@ export class AssistantService {
     // Safety guard: break if iterations exceed a high threshold.
     let iterations = 0
     while (true) {
-      console.log('[assistant] request iteration', { iterations, messagesCount: convo.length })
+      console.log('[assistant] request iteration', {
+        iterations,
+        messagesCount: convo.length,
+      })
       let result: any
       try {
         result = await chatComplete({
@@ -126,7 +139,8 @@ export class AssistantService {
         result = undefined
       }
 
-      if (!result) return 'The AI request failed or timed out. Please try again.'
+      if (!result)
+        return 'The AI request failed or timed out. Please try again.'
 
       const resAny = result as any
       // Track token usage if provided (raw OpenAI-style usage)
@@ -136,7 +150,9 @@ export class AssistantService {
           await assistantStore.addTokenUsage({
             prompt: usage.prompt_tokens ?? 0,
             completion: usage.completion_tokens ?? 0,
-            total: usage.total_tokens ?? ((usage.prompt_tokens ?? 0) + (usage.completion_tokens ?? 0)),
+            total:
+              usage.total_tokens ??
+              (usage.prompt_tokens ?? 0) + (usage.completion_tokens ?? 0),
           })
         } catch (_) {}
       }
@@ -145,7 +161,8 @@ export class AssistantService {
       const toolCalls: any[] = first?.message?.tool_calls || []
 
       if (!toolCalls.length) {
-        const out = first?.message?.content || first?.text || 'No content returned.'
+        const out =
+          first?.message?.content || first?.text || 'No content returned.'
         // Log cumulative token usage
         try {
           const usages = assistantStore.getTokenUsages()
@@ -157,7 +174,12 @@ export class AssistantService {
             }),
             { prompt: 0, completion: 0, total: 0 },
           )
-          console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
+          console.log(
+            '[assistant][tokens] prompt=%d completion=%d total=%d',
+            totals.prompt,
+            totals.completion,
+            totals.total,
+          )
         } catch (_) {}
         return out
       }
@@ -175,7 +197,9 @@ export class AssistantService {
       const call = toolCalls[0]
       const name = call.function?.name
       let args: any = {}
-      try { args = JSON.parse(call.function?.arguments || '{}') } catch (_) {}
+      try {
+        args = JSON.parse(call.function?.arguments || '{}')
+      } catch (_) {}
       console.log('[assistant][tool-call]', name, args)
 
       // Special handling: suggest a clickable Google search instead of executing dummy search_engine
@@ -193,12 +217,19 @@ export class AssistantService {
             }),
             { prompt: 0, completion: 0, total: 0 },
           )
-          console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
+          console.log(
+            '[assistant][tokens] prompt=%d completion=%d total=%d',
+            totals.prompt,
+            totals.completion,
+            totals.total,
+          )
         } catch (_) {}
         return `SEARCH_BUTTON:${url}|Search the web for \"${q}\"`
       }
       const fn = TOOL_DISPATCH[name]
-      const output = await (fn ? fn(args) : Promise.resolve({ error: `Unknown tool: ${name}` }))
+      const output = await (fn
+        ? fn(args)
+        : Promise.resolve({ error: `Unknown tool: ${name}` }))
       const toolMessage: ChatMessage = {
         role: 'tool',
         content: typeof output === 'string' ? output : JSON.stringify(output),
@@ -224,7 +255,12 @@ export class AssistantService {
         }),
         { prompt: 0, completion: 0, total: 0 },
       )
-      console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
+      console.log(
+        '[assistant][tokens] prompt=%d completion=%d total=%d',
+        totals.prompt,
+        totals.completion,
+        totals.total,
+      )
     } catch (_) {}
     return 'No content returned.'
   }
