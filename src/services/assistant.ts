@@ -1,7 +1,5 @@
-// No tokenizer needed
-
 import { LocalStorageKeys } from '../../const'
-import OpenAI from 'openai'
+import { initOpenAIClient, chatComplete } from './utilsOpenAI'
 import { assistantTools, get_page_contents, get_insights, search_history, get_tabs, get_current_tab } from './assistantTools'
 
 
@@ -84,25 +82,21 @@ export class AssistantStore {
 // Removed applyChatTemplate: we pass raw chat messages to the engine.
 
 export class AssistantService {
-  private client?: OpenAI
-  private modelId: string = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
+  private modelId: string = 'Qwen/Qwen3-235B-A22B-Instruct-2507-tput'
 
   async initialize() {
-    const { togetherai_api_key, togetherai_model } = await browser.storage.local.get([
+    const { togetherai_url, togetherai_api_key, togetherai_model } = await browser.storage.local.get([
+      LocalStorageKeys.TOGETHERAI_URL,
       LocalStorageKeys.TOGETHERAI_API_KEY,
       LocalStorageKeys.TOGETHERAI_MODEL,
     ])
 
     this.modelId = togetherai_model || this.modelId
-    this.client = new OpenAI({
-      apiKey: togetherai_api_key || '',
-      dangerouslyAllowBrowser: true,
-      baseURL: 'https://api.together.xyz/v1'
-    })
+    initOpenAIClient({apiKey: togetherai_api_key, baseURL: togetherai_url || "https://api.together.xyz/v1" })
   }
 
   async send(messages: ChatMessage[]) {
-    if (!this.client) await this.initialize()
+    await this.initialize()
 
     const TOOL_DISPATCH: any = {
       get_page_contents,
@@ -118,36 +112,36 @@ export class AssistantService {
     let iterations = 0
     while (true) {
       console.log('[assistant] request iteration', { iterations, messagesCount: convo.length })
-      const request = this.client!.chat.completions.create({
-        model: this.modelId,
-        // @ts-ignore
-        messages: convo as any,
-        tools: assistantTools as any,
-      })
-      const result = await Promise.race([
-        request,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('request-timeout')), 15000)),
-      ]).catch((err) => {
+      let result: any
+      try {
+        result = await chatComplete({
+          model: this.modelId,
+          // @ts-ignore
+          messages: convo as any,
+          tools: assistantTools as any,
+          timeoutMs: 15000,
+        })
+      } catch (err) {
         console.warn('[assistant] Together request failed:', err)
-        return undefined
-      })
+        result = undefined
+      }
 
       if (!result) return 'The AI request failed or timed out. Please try again.'
 
       const resAny = result as any
-      // Track token usage if provided
+      // Track token usage if provided (raw OpenAI-style usage)
       const usage = resAny?.usage
       if (usage) {
         try {
           await assistantStore.addTokenUsage({
-            prompt: usage.prompt_tokens,
-            completion: usage.completion_tokens,
-            total: usage.total_tokens,
+            prompt: usage.prompt_tokens ?? 0,
+            completion: usage.completion_tokens ?? 0,
+            total: usage.total_tokens ?? ((usage.prompt_tokens ?? 0) + (usage.completion_tokens ?? 0)),
           })
         } catch (_) {}
       }
 
-      const first = resAny.choices?.[0]
+      const first = resAny?.choices?.[0]
       const toolCalls: any[] = first?.message?.tool_calls || []
 
       if (!toolCalls.length) {

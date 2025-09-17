@@ -10,6 +10,8 @@ export const initEnvironment = async () => {
     (await browser.storage.local.set({ togetherai_api_key }))
   const togetherai_model = process.env.TOGETHERAI_MODEL || ''
   togetherai_model && (await browser.storage.local.set({ togetherai_model }))
+  const togetherai_url = process.env.TOGETHERAI_URL || ''
+  togetherai_url && (await browser.storage.local.set({ togetherai_url }))
   // Huggingface
   const hugging_face_api_key = process.env.HUGGINGFACE_API_KEY || ''
   hugging_face_api_key &&

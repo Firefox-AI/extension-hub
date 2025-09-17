@@ -17,6 +17,7 @@ export enum LocalStorageKeys {
   ENGINE_CREATED = 'engine_created',
   IS_LOCAL_AI_ENABLED = 'is_local_ai_enabled',
   // TogeatherAI
+  TOGETHERAI_URL = 'togetherai_url',
   TOGETHERAI_API_KEY = 'togetherai_api_key',
   TOGETHERAI_MODEL = 'togetherai_model',
   // Local Model
