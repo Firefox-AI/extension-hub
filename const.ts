@@ -30,6 +30,7 @@ export enum LocalStorageKeys {
 
   // Chat
   CHAT_HISTORY = 'chat_history',
+  CHAT_TOKENS = 'chat_tokens',
 
   // AI Mode
   AI_MODE_CHATS = 'ai_mode_chats',
