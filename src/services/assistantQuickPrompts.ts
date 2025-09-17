@@ -18,16 +18,20 @@ User Insights:
 {insights}
 
 ========
+The following tools are available to the brower assistant:
+- @get_page_content(url): retrieve raw page content for the given url, which can then be used to summarize the page or perform Q&A
+- @get_tabs(): retrieve user's opened tabs for more context
+
+========
 You are tasked with generating {n} quick suggestions that can help the user kick start a chat with the browser assistant.
 You must follow the following rules:
 - be concise, no ending punctuations and limit to maximum 8 words for each action,
-- use verbs like recommend/suggest more often,
+- items in insights are independent to each other,
 - if current tab context is available, only use that context and ignore user insights,
 - else if both opened tabs and insights are available, balance the suggestions between them,
 - suggestions should be common and must make logical sense,
 - do not suggest actions like share or save (not exhaustive) that will require additional actions,
-- do not suggest anything that will result in opening a new web page or requiring extra information to answer.
-`
+- do not suggest anything that will result in opening a new web page or requiring extra information to answer.`
 
 const formatJson = (obj: any) => {
   try {
@@ -141,7 +145,7 @@ export async function getQuickPrompts(n: number = 2): Promise<string[]> {
 
 // --- In-conversation quick prompts ---
 
-const QUICK_PROMPT_IN_CONVO_TEMPLATE = `You are an expert suggesting next actions for a browser assistant user.
+const QUICK_PROMPT_IN_CONVO_TEMPLATE = `You are an expert suggesting next actions for a browser assistant user during a conversation.
 
 ========
 Current Tab:
@@ -153,7 +157,7 @@ Conversation History (latest last):
 
 ========
 Generate {n} suggested next queries that the user might ask next.
-- Keep each under 12 words and conversational.
+- Keep each under 8 words and conversational.
 - Stay relevant to the current tab and recent assistant replies.
 - Do not repeat earlier user queries verbatim.
 - Provide diverse and helpful directions based on the above.

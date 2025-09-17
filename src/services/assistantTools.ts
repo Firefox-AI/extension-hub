@@ -120,10 +120,10 @@ export async function get_page_contents(args: { url: string }) {
 export async function get_insights(args: { query?: string } = {}) {
   // TODO
   return {
-    dietary: ['vegetarian'],
-    hobbies: ['hiking', 'photography'],
-    sports: ["soccer", 'badminton'],
-    interests: ['web tech', 'machine learning'],
+    dietary: ['asian'],
+    hobbies: ['puzzles'],
+    sports: ['soccer', 'badminton'],
+    interests: ['machine learning'],
   }
 }
 

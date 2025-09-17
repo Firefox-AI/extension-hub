@@ -18,6 +18,7 @@ export type ChatMessage = {
 export class AssistantStore {
   private static instance: AssistantStore | null = null
   private messages: ChatMessage[] = []
+  private tokenUsages: Array<{ prompt: number; completion: number; total: number }> = []
 
   static getInstance() {
     if (!AssistantStore.instance) {
@@ -30,7 +31,11 @@ export class AssistantStore {
     const { chat_history } = await browser.storage.local.get(
       LocalStorageKeys.CHAT_HISTORY,
     )
+    const { chat_tokens } = await browser.storage.local.get(
+      LocalStorageKeys.CHAT_TOKENS,
+    )
     this.messages = chat_history || []
+    this.tokenUsages = Array.isArray(chat_tokens) ? chat_tokens : []
     return this.messages
   }
 
@@ -54,9 +59,25 @@ export class AssistantStore {
 
   async clear() {
     this.messages = []
+    this.tokenUsages = []
     await browser.storage.local.set({
       [LocalStorageKeys.CHAT_HISTORY]: [],
+      [LocalStorageKeys.CHAT_TOKENS]: [],
     })
+  }
+
+  getTokenUsages() {
+    return this.tokenUsages
+  }
+
+  async addTokenUsage(usage: { prompt?: number; completion?: number; total?: number }) {
+    const u = {
+      prompt: usage.prompt ?? 0,
+      completion: usage.completion ?? 0,
+      total: usage.total ?? (usage.prompt ?? 0) + (usage.completion ?? 0),
+    }
+    this.tokenUsages = [...this.tokenUsages, u]
+    await browser.storage.local.set({ [LocalStorageKeys.CHAT_TOKENS]: this.tokenUsages })
   }
 }
 
@@ -113,12 +134,37 @@ export class AssistantService {
 
       if (!result) return 'The AI request failed or timed out. Please try again.'
 
-      const first = (result as any).choices?.[0]
+      const resAny = result as any
+      // Track token usage if provided
+      const usage = resAny?.usage
+      if (usage) {
+        try {
+          await assistantStore.addTokenUsage({
+            prompt: usage.prompt_tokens,
+            completion: usage.completion_tokens,
+            total: usage.total_tokens,
+          })
+        } catch (_) {}
+      }
+
+      const first = resAny.choices?.[0]
       const toolCalls: any[] = first?.message?.tool_calls || []
 
       if (!toolCalls.length) {
         const out = first?.message?.content || first?.text || 'No content returned.'
-        console.log('[assistant] final response length', out?.length || 0)
+        // Log cumulative token usage
+        try {
+          const usages = assistantStore.getTokenUsages()
+          const totals = usages.reduce(
+            (acc, u) => ({
+              prompt: acc.prompt + (u.prompt || 0),
+              completion: acc.completion + (u.completion || 0),
+              total: acc.total + (u.total || 0),
+            }),
+            { prompt: 0, completion: 0, total: 0 },
+          )
+          console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
+        } catch (_) {}
         return out
       }
 
@@ -143,6 +189,18 @@ export class AssistantService {
         const q = typeof args?.query === 'string' ? args.query : ''
         const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`
         // Return a special marker for the UI to render a button
+        try {
+          const usages = assistantStore.getTokenUsages()
+          const totals = usages.reduce(
+            (acc, u) => ({
+              prompt: acc.prompt + (u.prompt || 0),
+              completion: acc.completion + (u.completion || 0),
+              total: acc.total + (u.total || 0),
+            }),
+            { prompt: 0, completion: 0, total: 0 },
+          )
+          console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
+        } catch (_) {}
         return `SEARCH_BUTTON:${url}|Search the web for \"${q}\"`
       }
       const fn = TOOL_DISPATCH[name]
@@ -162,6 +220,18 @@ export class AssistantService {
       }
     }
 
+    try {
+      const usages = assistantStore.getTokenUsages()
+      const totals = usages.reduce(
+        (acc, u) => ({
+          prompt: acc.prompt + (u.prompt || 0),
+          completion: acc.completion + (u.completion || 0),
+          total: acc.total + (u.total || 0),
+        }),
+        { prompt: 0, completion: 0, total: 0 },
+      )
+      console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
+    } catch (_) {}
     return 'No content returned.'
   }
 }
