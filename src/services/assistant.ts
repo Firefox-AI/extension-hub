@@ -1,17 +1,10 @@
 import { LocalStorageKeys } from '../../const'
 import { initOpenAIClient, chatComplete } from './utilsOpenAI'
-import { assistantTools, get_page_contents, get_insights, search_history, get_tabs, get_current_tab } from './assistantTools'
+import type { ChatMessage } from './utilsOpenAI'
+import { assistantTools, get_page_content, get_insights, search_history, get_tabs, get_current_tab } from './assistantTools'
 
 
 export type ChatRole = 'system' | 'user' | 'assistant' | 'tool'
-
-export type ChatMessage = {
-  role: ChatRole
-  content: string
-  ts?: number
-  tool_call_id?: string
-  tool_calls?: any[]
-}
 
 export class AssistantStore {
   private static instance: AssistantStore | null = null
@@ -99,7 +92,7 @@ export class AssistantService {
     await this.initialize()
 
     const TOOL_DISPATCH: any = {
-      get_page_contents,
+      get_page_content,
       search_history,
       get_insights,
       get_tabs,

@@ -7,7 +7,7 @@ export const assistantTools: ToolDefinition[] = [
   {
     type: 'function',
     function: {
-      name: 'get_page_contents',
+      name: 'get_page_content',
       description: 'Returns the text content of a web page given the url. Only applicable to pages that are opened in a tab.',
       parameters: {
         type: 'object',
@@ -91,7 +91,7 @@ export const assistantTools: ToolDefinition[] = [
 
 // Standalone tool functions
 
-export async function get_page_contents(args: { url: string }) {
+export async function get_page_content(args: { url: string }) {
   const { url } = args
 
   // Validate URL and ensure it is currently open in a tab
@@ -119,6 +119,9 @@ export async function get_page_contents(args: { url: string }) {
 
 export async function get_insights(args: { query?: string } = {}) {
   // TODO
+  // default no insight
+  return {}
+  // default some insights
   return {
     dietary: ['asian'],
     hobbies: ['puzzles'],
