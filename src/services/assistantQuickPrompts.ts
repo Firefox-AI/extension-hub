@@ -1,9 +1,9 @@
 import { LocalStorageKeys } from '../../const'
 import { get_current_tab, get_tabs, get_insights } from './assistantTools'
 import { initOpenAIClient, chatComplete } from './utilsOpenAI'
-import type { ChatMessage } from './assistant'
+import type { ChatMessage } from './utilsOpenAI'
 
-const QUICK_PROMPT_TEMPLATE = `You are an expert in inferring what a browser user wants to do based on their current browser context and you are provided with the following:
+const QUICK_PROMPT_TEMPLATE = `You are an expert in suggesting a conversaton starter and you are provided with the following user context:
 
 ========
 Current Tab:
@@ -25,9 +25,9 @@ The following tools are available to the brower assistant:
 ========
 You are tasked with generating {n} quick suggestions that can help the user kick start a chat with the browser assistant.
 You must follow the following rules:
-- be concise, no ending punctuations and limit to maximum 8 words for each action,
+- be concise but specific, and limit to maximum 8 words for each action,
 - items in insights are independent to each other,
-- if current tab context is available, only use that context and ignore user insights,
+- if current tab context is available (new tab == no context), only use that context and ignore user insights,
 - else if both opened tabs and insights are available, balance the suggestions between them,
 - suggestions should be common and must make logical sense,
 - do not suggest actions like share or save (not exhaustive) that will require additional actions,
@@ -48,8 +48,7 @@ Generate {n} suggested next queries that the user might ask next.
 - Keep each under 8 words and conversational.
 - Stay relevant to the current tab and recent assistant replies.
 - Do not repeat earlier user queries verbatim.
-- Provide diverse and helpful directions based on the above.
-`
+- Provide diverse and helpful directions based on the above.`
 
 const formatJson = (obj: any) => {
   try {
@@ -119,7 +118,7 @@ async function generateQuickPromptsFromPrompt(filled: string, n: number): Promis
   }
   if (arrays.length) return Array.from(new Set(arrays)).slice(0, n)
   // 4) Fallback: extract quoted strings per line
-  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+  const lines: string[] = text.split(/\n+/).map((l: string) => l.trim()).filter(Boolean)
   const guesses: string[] = []
   for (const line of lines) {
     const qm = line.match(/\"([^\"]+)\"/) || line.match(/'([^']+)'/)

@@ -3,10 +3,11 @@ import { FeatureViewStyles } from '../FeatureViewStyles'
 import { assistantStore } from '../../services/assistant'
 import { sendAndAppend } from '../../services/assistantConversation'
 import TinyMark from '../../services/tinyMark'
+import type { ChatMessage } from '../../services/utilsOpenAI'
 import { getQuickPrompts, getQuickPromptsInConversation } from '../../services/assistantQuickPrompts'
 
 class MozAssistantChat extends LitElement {
-  messages: { role: string; content: string }[] = []
+  messages: ChatMessage[] = []
   inputValue: string = ''
   loading: boolean = false
   tinyMark: TinyMark

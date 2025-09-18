@@ -3,9 +3,10 @@ import OpenAI from 'openai'
 // Lightweight wrapper around the OpenAI JS client to keep all usage in one place.
 // Outside of this module, do not import or use the OpenAI client directly.
 
-export type ChatMessageLite = {
+export type ChatMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
+  ts?: number
   // Optional tool calling metadata passthrough
   tool_calls?: any[]
   tool_call_id?: string
@@ -42,7 +43,7 @@ export function getOpenAIClient(): OpenAI {
 
 export async function chatComplete(params: {
   model: string
-  messages: ChatMessageLite[]
+  messages: ChatMessage[]
   tools?: ChatToolsLite
   response_format?: any
   timeoutMs?: number
