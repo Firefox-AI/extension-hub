@@ -5,6 +5,7 @@ import { sendAndAppend } from '../../services/assistantConversation'
 import TinyMark from '../../services/tinyMark'
 import type { ChatMessage } from '../../services/utilsOpenAI'
 import { getQuickPrompts, getQuickPromptsInConversation } from '../../services/assistantQuickPrompts'
+import { LocalStorageKeys } from '../../../const'
 
 class MozAssistantChat extends LitElement {
   messages: ChatMessage[] = []
@@ -14,6 +15,7 @@ class MozAssistantChat extends LitElement {
   quickPrompts: string[] = []
   private boundOnActivated?: () => void
   private boundOnUpdated?: (tabId: number, changeInfo: any) => void
+  autoSearchSummarize: boolean = false
 
   static properties = {
     messages: { type: Array },
@@ -21,6 +23,7 @@ class MozAssistantChat extends LitElement {
     loading: { type: Boolean },
     tinyMark: { type: Object },
     quickPrompts: { type: Array },
+    autoSearchSummarize: { type: Boolean },
   }
 
   connectedCallback() {
@@ -40,6 +43,12 @@ class MozAssistantChat extends LitElement {
   async init() {
     await assistantStore.load()
     this.messages = assistantStore.getAll()
+    try {
+      const { assistant_auto_search_summarize } = await browser.storage.local.get(
+        LocalStorageKeys.ASSISTANT_AUTO_SEARCH_SUMMARIZE,
+      )
+      this.autoSearchSummarize = !!assistant_auto_search_summarize
+    } catch (_) {}
     // Preload up to 2 suggestions only if no conversation yet
     if (this.messages.length === 0) {
       this.quickPrompts = await getQuickPrompts(2)
@@ -114,7 +123,25 @@ class MozAssistantChat extends LitElement {
     return html`
       <div class="wrapper">
         <div class="container">
-          <h3 class="title">Assistant</h3>
+          <div class="header">
+            <h3 class="title">Assistant</h3>
+            <label class="toggle">
+              <input
+                type="checkbox"
+                .checked=${this.autoSearchSummarize}
+                @change=${async (e: Event) => {
+                  const checked = (e.target as HTMLInputElement).checked
+                  this.autoSearchSummarize = checked
+                  try {
+                    await browser.storage.local.set({
+                      [LocalStorageKeys.ASSISTANT_AUTO_SEARCH_SUMMARIZE]: checked,
+                    })
+                  } catch (_) {}
+                }}
+              />
+              <span>Auto open search and summarize</span>
+            </label>
+          </div>
           <div class="chat-window">
             ${this.messages.map(
               (m) => html`
@@ -189,6 +216,7 @@ class MozAssistantChat extends LitElement {
         border-radius: 8px;
         font-size: 14px;
       }
+      .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
       .chat-window { flex: 1; overflow-y: auto; padding: 1rem; background: var(--color-response-bg); }
       .bubble-wrapper { margin-bottom: 12px; }
       .bubble-wrapper.user { display: flex; justify-content: flex-end; }
@@ -197,6 +225,7 @@ class MozAssistantChat extends LitElement {
       .bubble.assistant { background: #e5e5ea; color: #000; border-bottom-left-radius: 0; }
       textarea { resize: none; padding: 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-input-bg); color: var(--color-fg); margin: 12px 0; }
       .footer { display: flex; justify-content: flex-end; gap: 8px; }
+      .toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-fg-subtle); }
       .loading { color: var(--color-fg-subtle); font-style: italic; }
       .suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
       .suggestion {

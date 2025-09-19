@@ -171,27 +171,79 @@ export class AssistantService {
       try { args = JSON.parse(call.function?.arguments || '{}') } catch (_) {}
       console.log('[assistant][tool-call]', name, args)
 
-      // Special handling: suggest a clickable Google search instead of executing dummy search_engine
+      // Special handling for search_engine: either suggest a button (default)
+      // or auto-open and summarize the SERP based on user toggle.
+      let output: any
       if (name === 'search_engine') {
         const q = typeof args?.query === 'string' ? args.query : ''
         const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`
-        // Return a special marker for the UI to render a button
+
+        // Read user preference (default: false => keep button behavior)
+        let autoSummarize = false
         try {
-          const usages = assistantStore.getTokenUsages()
-          const totals = usages.reduce(
-            (acc, u) => ({
-              prompt: acc.prompt + (u.prompt || 0),
-              completion: acc.completion + (u.completion || 0),
-              total: acc.total + (u.total || 0),
-            }),
-            { prompt: 0, completion: 0, total: 0 },
+          const { assistant_auto_search_summarize } = await browser.storage.local.get(
+            LocalStorageKeys.ASSISTANT_AUTO_SEARCH_SUMMARIZE,
           )
-          console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
+          autoSummarize = !!assistant_auto_search_summarize
         } catch (_) {}
-        return `SEARCH_BUTTON:${url}|Search the web for \"${q}\"`
+
+        if (!autoSummarize) {
+          // Return a special marker for the UI to render a button
+          try {
+            const usages = assistantStore.getTokenUsages()
+            const totals = usages.reduce(
+              (acc, u) => ({
+                prompt: acc.prompt + (u.prompt || 0),
+                completion: acc.completion + (u.completion || 0),
+                total: acc.total + (u.total || 0),
+              }),
+              { prompt: 0, completion: 0, total: 0 },
+            )
+            console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
+          } catch (_) {}
+          return `SEARCH_BUTTON:${url}|Search the web for \"${q}\"`
+        }
+
+        // Auto open SERP in background, wait for load, then fetch page content
+        const waitForComplete = (tabId: number, timeoutMs = 10000) =>
+          new Promise<void>((resolve) => {
+            let done = false
+            const timer = setTimeout(() => {
+              if (done) return
+              done = true
+              try { browser.tabs.onUpdated.removeListener(listener) } catch (_) {}
+              resolve()
+            }, timeoutMs)
+            const listener = (updatedTabId: number, changeInfo: any) => {
+              if (updatedTabId === tabId && changeInfo.status === 'complete') {
+                if (done) return
+                done = true
+                clearTimeout(timer)
+                try { browser.tabs.onUpdated.removeListener(listener) } catch (_) {}
+                resolve()
+              }
+            }
+            browser.tabs.onUpdated.addListener(listener)
+          })
+
+        try {
+          const tab = await browser.tabs.create({ url, active: false })
+          if (tab.id) await waitForComplete(tab.id, 5000)
+        } catch (e) {
+          console.warn('[assistant][search_engine] failed to open SERP:', e)
+        }
+
+        // Fetch content from the opened SERP
+        try {
+          const page = await get_page_content({ url })
+          output = { url, page }
+        } catch (e) {
+          output = { url, error: 'Failed to retrieve SERP content.' }
+        }
+      } else {
+        const fn = TOOL_DISPATCH[name]
+        output = await (fn ? fn(args) : Promise.resolve({ error: `Unknown tool: ${name}` }))
       }
-      const fn = TOOL_DISPATCH[name]
-      const output = await (fn ? fn(args) : Promise.resolve({ error: `Unknown tool: ${name}` }))
       const toolMessage: ChatMessage = {
         role: 'tool',
         content: typeof output === 'string' ? output : JSON.stringify(output),
