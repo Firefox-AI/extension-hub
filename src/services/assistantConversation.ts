@@ -63,7 +63,7 @@ export async function sendAndAppend(userText: string) {
 
   // Temporarily prepend instruction to the last user message ONLY for the
   // request sent to the LLM (not stored or shown in UI).
-  const PREFIX = 'Instruction: do not search the web unless absoluted needed to or asked real time information or knowledge.\nQuery: '
+  const PREFIX = 'Instruction: do not search the web unless absolutely needed to or asked real time information or knowledge.\nQuery: '
   const modifiedForSend: ChatMessage[] = (() => {
     const cloned = messages.map((m) => ({ ...m }))
     for (let i = cloned.length - 1; i >= 0; i--) {

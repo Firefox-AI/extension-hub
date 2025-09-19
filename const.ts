@@ -36,6 +36,9 @@ export enum LocalStorageKeys {
   // AI Mode
   AI_MODE_CHATS = 'ai_mode_chats',
   AI_MODE_PERSISTENCE_MODE = 'ai_mode_persistence_mode',
+
+  // Assistant behavior
+  ASSISTANT_AUTO_SEARCH_SUMMARIZE = 'assistant_auto_search_summarize',
 }
 
 export enum SessionStorageKeys {
