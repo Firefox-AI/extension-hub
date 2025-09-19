@@ -74,13 +74,13 @@ export const assistantTools: ToolDefinition[] = [
     function: {
       name: 'search_engine',
       description:
-        'Opens a new page and initiates an internet search with the given query.',
+        'Only use this when the request is asking for real time information or up-to-date facts which can ONLY be obtained from a web search.',
       parameters: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
-            description: 'The query to search for on the web.',
+            description: 'The optimized query to search for on the web.',
           },
         },
         required: ['query'],
