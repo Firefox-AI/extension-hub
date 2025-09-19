@@ -5,6 +5,7 @@ import { sendAndAppend } from '../../services/assistantConversation'
 import TinyMark from '../../services/tinyMark'
 import type { ChatMessage } from '../../services/utilsOpenAI'
 import { getQuickPrompts, getQuickPromptsInConversation } from '../../services/assistantQuickPrompts'
+import { generateInsightsFromConversation, formatInsightsMarkdown } from '../../services/assistantInsight'
 import { LocalStorageKeys } from '../../../const'
 
 class MozAssistantChat extends LitElement {
@@ -13,6 +14,8 @@ class MozAssistantChat extends LitElement {
   loading: boolean = false
   tinyMark: TinyMark
   quickPrompts: string[] = []
+  insightText: string = ''
+  insightLoading: boolean = false
   private boundOnActivated?: () => void
   private boundOnUpdated?: (tabId: number, changeInfo: any) => void
   autoSearchSummarize: boolean = false
@@ -23,6 +26,8 @@ class MozAssistantChat extends LitElement {
     loading: { type: Boolean },
     tinyMark: { type: Object },
     quickPrompts: { type: Array },
+    insightText: { type: String },
+    insightLoading: { type: Boolean },
     autoSearchSummarize: { type: Boolean },
   }
 
@@ -55,8 +60,9 @@ class MozAssistantChat extends LitElement {
     }
   }
 
-  async handleSend(textOverride?: string) {
-    const text = (textOverride ?? this.inputValue).trim()
+  async handleSend(textOverride?: unknown) {
+    const overrideStr = typeof textOverride === 'string' ? textOverride : undefined
+    const text = (overrideStr ?? this.inputValue).trim()
     if (!text || this.loading) return
     // Optimistically render the user's message immediately
     this.messages = [...this.messages, { role: 'user', content: text }]
@@ -156,6 +162,19 @@ class MozAssistantChat extends LitElement {
               : ''}
           </div>
 
+          ${this.insightLoading || this.insightText
+            ? html`<div class="insight-section">
+                <div class="insight-header">
+                  <strong>User Insights</strong>
+                </div>
+                <div class="insight-body">
+                  ${this.insightLoading
+                    ? html`<div class="loading">Generating insights…</div>`
+                    : html`<div class="text" .innerHTML=${this.tinyMark.parse(this.insightText)}></div>`}
+                </div>
+              </div>`
+            : ''}
+
           ${this.quickPrompts.length
             ? html`<div class="suggestions">
                 ${this.quickPrompts.map(
@@ -184,9 +203,12 @@ class MozAssistantChat extends LitElement {
             <button class="secondary-button" @click=${this.handleClear}>
               Clear
             </button>
+            <button class="secondary-button" @click=${() => this.handleGenerateInsight()} ?disabled=${this.insightLoading}>
+              ${this.insightLoading ? '…' : 'Generate insight'}
+            </button>
             <button
               class="primary-button"
-              @click=${this.handleSend}
+              @click=${() => this.handleSend()}
               ?disabled=${!this.inputValue.trim() || this.loading}
             >
               ${this.loading ? '…' : 'Send'}
@@ -253,6 +275,21 @@ class MozAssistantChat extends LitElement {
         background: #15803d; /* darker on hover */
         border-color: #166534;
       }
+      .insight-section {
+        margin-top: 10px;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        background: var(--color-response-bg);
+      }
+      .insight-header {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--color-border);
+        font-size: 13px;
+        color: var(--color-fg);
+      }
+      .insight-body {
+        padding: 10px 12px;
+      }
     `,
   ]
   
@@ -270,6 +307,21 @@ class MozAssistantChat extends LitElement {
   private async refreshQuickPrompts() {
     if (this.messages.length === 0) {
       this.quickPrompts = await getQuickPrompts(2)
+    }
+  }
+
+  private async handleGenerateInsight() {
+    if (this.insightLoading) return
+    this.insightLoading = true
+    try {
+      const result = await generateInsightsFromConversation(this.messages)
+      this.insightText = formatInsightsMarkdown(result)
+    } catch (e) {
+      console.warn('[assistant][insight] generation failed:', e)
+      this.insightText = 'Failed to generate insights.'
+    } finally {
+      this.insightLoading = false
+      this.updateComplete.then(() => this.scrollToBottom())
     }
   }
 
