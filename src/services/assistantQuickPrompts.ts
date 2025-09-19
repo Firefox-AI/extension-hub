@@ -6,6 +6,10 @@ import type { ChatMessage } from './utilsOpenAI'
 const QUICK_PROMPT_TEMPLATE = `You are an expert in suggesting a conversaton starter and you are provided with the following user context:
 
 ========
+Today's date:
+{date}
+
+========
 Current Tab:
 {current_tab}
 
@@ -31,9 +35,15 @@ You must follow the following rules:
 - else if both opened tabs and insights are available, balance the suggestions between them,
 - suggestions should be common and must make logical sense,
 - do not suggest actions like share or save (not exhaustive) that will require additional actions,
-- do not suggest anything that will result in opening a new web page or requiring extra information to answer.`
+- do not suggest anything that will result in opening a new web page or requiring extra information to answer.
+
+`
 
 const QUICK_PROMPT_IN_CONVO_TEMPLATE = `You are an expert suggesting next actions for a browser assistant user during a conversation.
+
+========
+Today's date:
+{date}
 
 ========
 Current Tab:
@@ -154,11 +164,13 @@ export async function getQuickPrompts(n: number = 2): Promise<string[]> {
       get_insights({}),
     ])
 
+    const today = new Date().toISOString().slice(0, 10)
     const filled = QUICK_PROMPT_TEMPLATE
       .replace('{current_tab}', formatJson(tab))
       .replace('{opened_tabs}', formatJson(tabs))
       .replace('{insights}', formatJson(insights))
       .replace('{n}', String(n))
+      .replace('{date}', today)
 
     return await generateQuickPromptsFromPrompt(filled, n)
   } catch (e) {
@@ -172,10 +184,12 @@ export async function getQuickPromptsInConversation(history: ChatMessage[], n: n
     const tab = await get_current_tab({})
     const convo = trimConversation(history)
 
+    const today = new Date().toISOString().slice(0, 10)
     const filled = QUICK_PROMPT_IN_CONVO_TEMPLATE
       .replace('{current_tab}', JSON.stringify(tab))
       .replace('{conversation}', JSON.stringify(convo))
       .replace('{n}', String(n))
+      .replace('{date}', today)
     return await generateQuickPromptsFromPrompt(filled, n)
   } catch (e) {
     console.warn('[assistant][quick-prompts][in-convo] failed:', e)
