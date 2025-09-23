@@ -1,6 +1,7 @@
 import ExtensionHub from './components/ExtensionHub'
 import MozAIMode from './features/aimode/MozAIMode'
 import MozAttributeComparison from './features/MozAttributeComparison'
+import MozHistoryInsights from './features/MozHistoryInsights'
 import MozChat from './features/chat/MozChat'
 import MozConversationalOnboarding from './features/onboarding/MozConversationalOnboarding'
 import MozExtensionHubDash from './features/MozExtensionHubDash'
@@ -17,6 +18,7 @@ import MozAssistantChat from './features/assistant/MozAssistantChat'
 
 customElements.define('moz-ai-mode', MozAIMode)
 customElements.define('moz-attribute-comparison', MozAttributeComparison)
+customElements.define('moz-history-insights', MozHistoryInsights)
 customElements.define('moz-chat', MozChat)
 customElements.define(
   'moz-conversational-onboarding',
