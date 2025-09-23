@@ -10,6 +10,7 @@ type FeatureOption = {
     | 'chat'
     | 'conversational_onboarding'
     | 'extensionhub_dashboard'
+    | 'history_insights'
     | 'page_qa'
     | 'page_summarization'
     | 'plan_checklist'
@@ -73,6 +74,12 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     label: 'Attribute Comparison',
     component: () =>
       html`<moz-attribute-comparison></moz-attribute-comparison>`,
+  },
+  {
+    value: 'history_insights',
+    label: 'History Insights',
+    component: () =>
+      html`<moz-history-insights></moz-history-insights>`,
   },
   {
     value: 'tabs_debug',
