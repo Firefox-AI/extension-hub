@@ -166,6 +166,9 @@ class MozAssistantChat extends LitElement {
             ? html`<div class="insight-section">
                 <div class="insight-header">
                   <strong>User Insights</strong>
+                  <div class="insight-actions">
+                    <button class="icon-button" title="Close" @click=${() => this.handleCloseInsight()}>✕</button>
+                  </div>
                 </div>
                 <div class="insight-body">
                   ${this.insightLoading
@@ -200,19 +203,29 @@ class MozAssistantChat extends LitElement {
           ></textarea>
 
           <div class="footer">
-            <button class="secondary-button" @click=${this.handleClear}>
-              Clear
-            </button>
-            <button class="secondary-button" @click=${() => this.handleGenerateInsight()} ?disabled=${this.insightLoading}>
-              ${this.insightLoading ? '…' : 'Generate insight'}
-            </button>
-            <button
-              class="primary-button"
-              @click=${() => this.handleSend()}
-              ?disabled=${!this.inputValue.trim() || this.loading}
-            >
-              ${this.loading ? '…' : 'Send'}
-            </button>
+            <div class="footer-left">
+              <button class="secondary-button" @click=${() => this.handleGenerateInsight()} ?disabled=${this.insightLoading}>
+                ${this.insightLoading ? '…' : 'Generate insight'}
+              </button>
+              <button class="secondary-button" @click=${() => this.handleLoadSavedInsight()} ?disabled=${this.insightLoading}>
+                Load insights
+              </button>
+              <button class="secondary-button" @click=${() => this.handleClearInsights()} ?disabled=${this.insightLoading}>
+                Clear insights
+              </button>
+            </div>
+            <div class="footer-right">
+              <button class="secondary-button" @click=${this.handleClear}>
+                Clear chat
+              </button>
+              <button
+                class="primary-button"
+                @click=${() => this.handleSend()}
+                ?disabled=${!this.inputValue.trim() || this.loading}
+              >
+                ${this.loading ? '…' : 'Send'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -246,7 +259,8 @@ class MozAssistantChat extends LitElement {
       .bubble.user { background: var(--color-primary); color: #fff; border-bottom-right-radius: 0; }
       .bubble.assistant { background: #e5e5ea; color: #000; border-bottom-left-radius: 0; }
       textarea { resize: none; padding: 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-input-bg); color: var(--color-fg); margin: 12px 0; }
-      .footer { display: flex; justify-content: flex-end; gap: 8px; }
+      .footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .footer-left, .footer-right { display: flex; gap: 8px; align-items: center; }
       .toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-fg-subtle); }
       .loading { color: var(--color-fg-subtle); font-style: italic; }
       .suggestions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
@@ -286,9 +300,24 @@ class MozAssistantChat extends LitElement {
         border-bottom: 1px solid var(--color-border);
         font-size: 13px;
         color: var(--color-fg);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
       }
       .insight-body {
         padding: 10px 12px;
+      }
+      .icon-button {
+        background: transparent;
+        border: none;
+        color: var(--color-fg-subtle);
+        cursor: pointer;
+        font-size: 14px;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .icon-button:hover {
+        background: rgba(0,0,0,0.05);
       }
     `,
   ]
@@ -322,6 +351,39 @@ class MozAssistantChat extends LitElement {
     } finally {
       this.insightLoading = false
       this.updateComplete.then(() => this.scrollToBottom())
+    }
+  }
+
+  private async handleLoadSavedInsight() {
+    try {
+      const res = await browser.storage.local.get(LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS)
+      console.log("Show insight:", res)
+      const saved = (res as any)?.[LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]
+      if (!saved) {
+        this.insightText = 'No saved insights found.'
+      } else {
+        this.insightText = formatInsightsMarkdown(Array.isArray(saved) ? saved : [saved])
+      }
+    } catch (e) {
+      console.warn('[assistant][insight] load saved failed:', e)
+      this.insightText = 'Failed to load saved insights.'
+    } finally {
+      this.updateComplete.then(() => this.scrollToBottom())
+    }
+  }
+
+  private handleCloseInsight() {
+    this.insightText = ''
+    this.insightLoading = false
+  }
+
+  private async handleClearInsights() {
+    try {
+      await browser.storage.local.set({ [LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]: [] })
+      this.insightText = ''
+      this.insightLoading = false
+    } catch (e) {
+      console.warn('[assistant][insight] clear failed:', e)
     }
   }
 

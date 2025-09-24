@@ -39,6 +39,9 @@ export enum LocalStorageKeys {
 
   // Assistant behavior
   ASSISTANT_AUTO_SEARCH_SUMMARIZE = 'assistant_auto_search_summarize',
+
+  // Assistant insights
+  ASSISTANT_CONVERSATION_INSIGHTS = 'assistant_conversation_insights',
 }
 
 export enum SessionStorageKeys {

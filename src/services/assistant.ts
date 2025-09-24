@@ -112,7 +112,7 @@ export class AssistantService {
           // @ts-ignore
           messages: convo as any,
           tools: assistantTools as any,
-          timeoutMs: 15000,
+          timeoutMs: 30000,
         })
       } catch (err) {
         console.warn('[assistant] Together request failed:', err)

@@ -1,6 +1,7 @@
 // Minimal tool abstracts and simple dummy handlers.
 // Tools are described with OpenAI-compatible function schemas.
 import { ToolDefinition } from '../../types'
+import { LocalStorageKeys } from '../../const'
 
 
 export const assistantTools: ToolDefinition[] = [
@@ -39,24 +40,24 @@ export const assistantTools: ToolDefinition[] = [
       },
     },
   },
-  {
-    type: 'function',
-    function: {
-      name: 'get_insights',
-      description:
-        "Retrieve the user's saved insights (shopping, brands, dietary, hobbies, interests, etc.) which could help in personalizing the response. If a query is provided, it will be used to filter for relevant insights.",
-      parameters: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description:
-              'The user query to filter for relevant insights if provided.',
-          },
-        },
-      },
-    },
-  },
+  // {
+  //   type: 'function',
+  //   function: {
+  //     name: 'get_insights',
+  //     description:
+  //       "Retrieve the user's saved insights (shopping, brands, dietary, hobbies, interests, etc.) which could help in personalizing the response. If a query is provided, it will be used to filter for relevant insights.",
+  //     parameters: {
+  //       type: 'object',
+  //       properties: {
+  //         query: {
+  //           type: 'string',
+  //           description:
+  //             'The user query to filter for relevant insights if provided.',
+  //         },
+  //       },
+  //     },
+  //   },
+  // },
   {
     type: 'function',
     function: {
@@ -118,16 +119,31 @@ export async function get_page_content(args: { url: string }) {
 }
 
 export async function get_insights(args: { query?: string } = {}) {
-  // TODO
-  // default no insight
-  return {}
-  // default some insights
-  return {
-    dietary: ['asian'],
-    hobbies: ['puzzles'],
-    sports: ['soccer', 'badminton'],
-    interests: ['machine learning'],
+  const { query } = args
+  const res = await browser.storage.local.get(LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS)
+  const saved = (res as any)?.[LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]
+  const entries: any[] = Array.isArray(saved) ? saved : []
+
+  if (!query || typeof query !== 'string' || !query.trim()) {
+    return entries
   }
+
+  const q = query.toLowerCase()
+  const filteredEntries: any[] = []
+  for (const insight of entries) {
+    const filtered: any = {}
+    for (const [cat, arr] of Object.entries(insight || {})) {
+      if (cat === '_rawText') continue
+      const items = Array.isArray(arr) ? (arr as any[]).map((v) => String(v)) : []
+      const catMatch = cat.toLowerCase().includes(q)
+      const itemMatches = items.filter((s) => s.toLowerCase().includes(q))
+      if (catMatch) filtered[cat] = items
+      else if (itemMatches.length) filtered[cat] = itemMatches
+    }
+    if (Object.keys(filtered).length) filteredEntries.push(filtered)
+  }
+
+  return filteredEntries.length ? filteredEntries : entries
 }
 
 export async function search_history(args: { search_term: string }) {
