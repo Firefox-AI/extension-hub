@@ -93,18 +93,17 @@ export function generateProfileInputs(rows: ProfileRow[]) {
 }
 
 export function buildUserPrompt(profile: unknown): string {
-  return [
-    'Use ONLY the provided browsing profile (no external knowledge) and AVOID any PII information.',
-    'Category is a concise topic name.',
-    'user_attribute are mostly entities, brand names, and some useful preferences (1 or 2 words).',
-    'For EACH category, include:',
-    '- top_domains: top 10 {domain, visit_sum} by descending visit_sum',
-    '- top_user_attributes: top 12 entities or brand names or preferences inferred from domains/titles;',
-    '',
-    "Let's think step by step",
-    'INPUT PROFILE:',
-    JSON.stringify(profile, null, 2),
-  ].join('\n')
+    return [
+        'Use ONLY the provided browsing profile (no external knowledge) and AVOID any PII information, IDs and gibberish information.',
+        'Category is a concise topic name.',
+        'user_attribute are mostly entities, brand names, category type and meaniningful useful preferences (1 or 2 words).',
+        'For EACH category, include:',
+        '- top_user_attributes: top 12 entities or brand names or category type or meaniningful preferences inferred from domains/titles;',
+        '',
+        "Let's think step by step",
+        'INPUT PROFILE:',
+        JSON.stringify(profile, null, 2),
+    ].join('\n')
 }
 
 export const SYSTEM_MSG =
@@ -127,7 +126,7 @@ export const CATEGORY_OBJ = {
     },
     top_user_attributes: { type: 'array', maxItems: 12, items: { type: 'string' } },
   },
-  required: ['name', 'top_domains', 'top_user_attributes'],
+  required: ['name', 'top_user_attributes'],
 } as const
 
 export const CATEGORY_ARRAY_SCHEMA = {
@@ -265,3 +264,33 @@ export async function getRecentHistory(opts?: {
   return rows
 }
 
+export async function generateInsightsFromHistory(options?: {
+  days?: number
+  maxResults?: number
+  halfLifeDays?: number
+}): Promise<any> {
+  const days = options?.days ?? 60
+  const maxResults = options?.maxResults ?? 500
+  const halfLifeDays = options?.halfLifeDays ?? 14
+
+  const baseRows = await getRecentHistory({ days, maxResults })
+  const rows: ProfileRow[] = addWeights(baseRows, halfLifeDays)
+  const profile = generateProfileInputs(rows)
+  const prompt = buildUserPrompt(profile)
+  const out = await summarizeCategories(prompt)
+
+  // Persist under HISTORY_INSIGHTS as a list of JSONs
+  try {
+    const existing = await browser.storage.local.get(LocalStorageKeys.HISTORY_INSIGHTS)
+    const prev = (existing as any)?.[LocalStorageKeys.HISTORY_INSIGHTS]
+    let list: any[] = []
+    if (Array.isArray(prev)) list = prev
+    else if (prev && typeof prev === 'object') list = [prev]
+    list = [...list, out]
+    await browser.storage.local.set({ [LocalStorageKeys.HISTORY_INSIGHTS]: list })
+  } catch (_) {
+    // Non-fatal if persistence fails
+  }
+
+  return out
+}

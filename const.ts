@@ -42,6 +42,7 @@ export enum LocalStorageKeys {
 
   // Assistant insights
   ASSISTANT_CONVERSATION_INSIGHTS = 'assistant_conversation_insights',
+  HISTORY_INSIGHTS = 'histroy_insights',
 }
 
 export enum SessionStorageKeys {
