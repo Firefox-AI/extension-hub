@@ -7,24 +7,26 @@ import type { ChatMessage } from './utilsOpenAI'
 // Placeholders:
 // - {user_queries}: JSON array of strings (user-authored queries)
 // - {current_tab}: JSON object with current tab context (or null)
-const INSIGHT_PROMPT_TEMPLATE = `You are an expert analyst that extracts user insights from their past queries.
+const INSIGHT_PROMPT_TEMPLATE = `You are an expert analyst that extracts user insights from their past queries (conversations) with the browser assistant.
 
 Inputs:
 - user_queries: JSON array of user-authored queries/messages in chronological order.
 - current_tab: JSON object with the user's currently active tab context (url, title, optional description). Use only if relevant.
 
 Goal:
-- Infer the user's explicitly stated interest category, notable preferences, behavior patterns, and produce a concise summary.
-- Be conservative; only infer if there is strong evidence in the user queries.
-- Do not include transient facts.
+- Identify stable, explicit categories and their attributes mentioned by the user (e.g., categories like dietary, brands, frameworks, hobbies; attributes are detailed entities under that category including polarity if essential).
+- Be conservative; only include categories/attributes with strong evidence from the user queries.
 
-Return a concise JSON object following this schema:
+For example, category can be "Diet Preferences" and one of the values can be "avoid broccoli" where avoid is polarity and broccoli is the entity.
+
+Return ONLY a concise JSON object of key-value pairs:
 {
-  "interest_categories": string[],   // categories the user explicitly asked about repeatedly or strongly
-  "notable_preferences": string[], // concrete preferences (e.g., brands, frameworks, genre, diets) if present
-  "behavior_patterns": string[],   // consistent habits or patterns (e.g., compares prices, asks for tutorials)
-  "summary": string                // 1-2 sentence summary synthesizing the above
+  "<category1>": ["<attribute>", "<attribute>", ...],
+  "<category2>": ["..."]
 }
+where:
+- Keys are category names.
+- Values are non-empty arrays of unique attributes + optional polarity that are a few words each.
 
 current_tab:
 {current_tab}
@@ -33,14 +35,8 @@ user_queries:
 {user_queries}
 `
 
-type InsightResult = {
-  interest_categories?: string[]
-  notable_preferences?: string[]
-  behavior_patterns?: string[]
-  summary?: string
-  // keep the raw content for debugging/fallback rendering
-  _rawText?: string
-}
+type InsightMap = { [category: string]: string[] }
+type InsightResult = InsightMap & { _rawText?: string }
 
 function extractUserQueries(history: ChatMessage[]): string[] {
   const qs: string[] = []
@@ -56,6 +52,10 @@ function extractUserQueries(history: ChatMessage[]): string[] {
 export async function generateInsightsFromConversation(history: ChatMessage[]): Promise<InsightResult> {
   try {
     const queries = extractUserQueries(history)
+    // If there are no user-authored queries, skip generation and persistence.
+    if (!queries.length) {
+      return {}
+    }
     const currentTab = await get_current_tab({})
     const { togetherai_url, togetherai_api_key, togetherai_model } = await browser.storage.local.get([
       LocalStorageKeys.TOGETHERAI_URL,
@@ -70,14 +70,12 @@ export async function generateInsightsFromConversation(history: ChatMessage[]): 
       .replace('{current_tab}', JSON.stringify(currentTab ?? null, null, 2))
 
     const SCHEMA = {
-      title: 'UserInsights',
+      title: 'UserInsightsMap',
+      description: 'A flat object mapping category to an array of strings.',
       type: 'object',
-      required: ['interest_categories', 'notable_preferences', 'behavior_patterns', 'summary'],
-      properties: {
-        interest_categories: { type: 'array', items: { type: 'string' } },
-        notable_preferences: { type: 'array', items: { type: 'string' } },
-        behavior_patterns: { type: 'array', items: { type: 'string' } },
-        summary: { type: 'string' },
+      additionalProperties: {
+        type: 'array',
+        items: { type: 'string' },
       },
     }
 
@@ -93,26 +91,48 @@ export async function generateInsightsFromConversation(history: ChatMessage[]): 
     })
 
     const text = ((result as any).choices?.[0]?.message?.content || '').trim()
-    const parsed: InsightResult = JSON.parse(text)
-    return { ...parsed, _rawText: text }
-  } catch (e) {
-    // Fallback: return a lightweight placeholder when parsing fails
-    return {
-      summary:
-        'Could not parse generated insights. Please try again or refine your queries.',
+    const parsed: InsightMap = JSON.parse(text)
+    // Persist: append to list under ASSISTANT_CONVERSATION_INSIGHTS
+    try {
+      const existing = await browser.storage.local.get(LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS)
+      const prev = (existing as any)?.[LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]
+      let list: InsightMap[] = []
+      if (Array.isArray(prev)) list = prev as InsightMap[]
+      else if (prev && typeof prev === 'object') list = [prev as InsightMap]
+      // Append new item
+      list = [...list, parsed]
+      await browser.storage.local.set({
+        [LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]: list,
+      })
+    } catch (_) {
+      // Non-fatal if persistence fails
     }
+    return { ...(parsed as any), _rawText: text }
+  } catch (e) {
+    // Fallback: do not append any failure message to storage; surface empty result
+    return {}
   }
 }
 
-export function formatInsightsMarkdown(r: InsightResult): string {
-  const sect = (title: string, items?: string[]) => {
-    if (!items || !items.length) return ''
-    return `\n**${title}**\n- ${items.join('\n- ')}`
+export function formatInsightsMarkdown(r: InsightMap | InsightResult | InsightMap[]): string {
+  if (!r) return 'No insights found.'
+  // If array, merge categories with unique items
+  const toArray = Array.isArray(r) ? r as InsightMap[] : [r as InsightMap]
+  const merged: Record<string, string[]> = {}
+  for (const m of toArray) {
+    if (!m || typeof m !== 'object') continue
+    for (const [cat, items] of Object.entries(m)) {
+      if (cat === '_rawText') continue
+      const arr = Array.isArray(items) ? items.map((v) => String(v)) : []
+      if (!arr.length) continue
+      merged[cat] = Array.from(new Set([...(merged[cat] || []), ...arr]))
+    }
   }
   const parts: string[] = []
-  if (r.summary) parts.push(r.summary)
-  parts.push(sect('Interest Categories', r.interest_categories))
-  parts.push(sect('Notable Preferences', r.notable_preferences))
-  parts.push(sect('Behavior Patterns', r.behavior_patterns))
-  return parts.filter(Boolean).join('\n') || 'No insights found.'
+  for (const [cat, items] of Object.entries(merged)) {
+    if (!items || !items.length) continue
+    const title = cat.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
+    parts.push(`\n**${title}**\n- ${items.join('\n- ')}`)
+  }
+  return parts.join('\n') || 'No insights found.'
 }
