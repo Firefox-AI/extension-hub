@@ -120,9 +120,40 @@ export async function get_page_content(args: { url: string }) {
 
 export async function get_insights(args: { query?: string } = {}) {
   const { query } = args
-  const res = await browser.storage.local.get(LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS)
-  const saved = (res as any)?.[LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]
-  const entries: any[] = Array.isArray(saved) ? saved : []
+  const res = await browser.storage.local.get([
+    LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS,
+    LocalStorageKeys.HISTORY_INSIGHTS,
+  ])
+
+  const convSaved = (res as any)?.[LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]
+  const histSaved = (res as any)?.[LocalStorageKeys.HISTORY_INSIGHTS]
+
+  const convList: any[] = Array.isArray(convSaved)
+    ? convSaved
+    : convSaved && typeof convSaved === 'object'
+      ? [convSaved]
+      : []
+
+  const histListRaw: any[] = Array.isArray(histSaved)
+    ? histSaved
+    : histSaved && typeof histSaved === 'object'
+      ? [histSaved]
+      : []
+
+  // Convert history schema (categories array) -> flat map { [category]: string[] }
+  const histListAsMaps = histListRaw.map((h) => {
+    const map: Record<string, string[]> = {}
+    const cats = Array.isArray(h?.categories) ? h.categories : []
+    for (const c of cats) {
+      const name = (c?.name ?? '').toString()
+      if (!name) continue
+      const attrs = Array.isArray(c?.top_user_attributes) ? c.top_user_attributes.map((x: any) => String(x)) : []
+      if (attrs.length) map[name] = Array.from(new Set(attrs))
+    }
+    return map
+  })
+
+  const entries: any[] = [...convList, ...histListAsMaps]
 
   if (!query || typeof query !== 'string' || !query.trim()) {
     return entries

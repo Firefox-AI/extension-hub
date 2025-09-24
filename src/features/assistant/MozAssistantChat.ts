@@ -6,6 +6,7 @@ import TinyMark from '../../services/tinyMark'
 import type { ChatMessage } from '../../services/utilsOpenAI'
 import { getQuickPrompts, getQuickPromptsInConversation } from '../../services/assistantQuickPrompts'
 import { generateInsightsFromConversation, formatInsightsMarkdown } from '../../services/assistantInsight'
+import { generateInsightsFromHistory } from '../../services/historyInsight'
 import { LocalStorageKeys } from '../../../const'
 
 class MozAssistantChat extends LitElement {
@@ -204,8 +205,11 @@ class MozAssistantChat extends LitElement {
 
           <div class="footer">
             <div class="footer-left">
+              <button class="secondary-button" @click=${() => this.handleGenerateHistoryInsight()} ?disabled=${this.insightLoading}>
+                ${this.insightLoading ? '…' : 'Generate insight from history'}
+              </button>
               <button class="secondary-button" @click=${() => this.handleGenerateInsight()} ?disabled=${this.insightLoading}>
-                ${this.insightLoading ? '…' : 'Generate insight'}
+                ${this.insightLoading ? '…' : 'Generate insight from conversation'}
               </button>
               <button class="secondary-button" @click=${() => this.handleLoadSavedInsight()} ?disabled=${this.insightLoading}>
                 Load insights
@@ -356,13 +360,44 @@ class MozAssistantChat extends LitElement {
 
   private async handleLoadSavedInsight() {
     try {
-      const res = await browser.storage.local.get(LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS)
-      console.log("Show insight:", res)
-      const saved = (res as any)?.[LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]
-      if (!saved) {
+      const res = await browser.storage.local.get([
+        LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS,
+        LocalStorageKeys.HISTORY_INSIGHTS,
+      ])
+      const convSaved = (res as any)?.[LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]
+      const histSaved = (res as any)?.[LocalStorageKeys.HISTORY_INSIGHTS]
+
+      const convList = Array.isArray(convSaved)
+        ? convSaved
+        : convSaved && typeof convSaved === 'object'
+          ? [convSaved]
+          : []
+
+      const histList = Array.isArray(histSaved)
+        ? histSaved
+        : histSaved && typeof histSaved === 'object'
+          ? [histSaved]
+          : []
+
+      // Convert history schema to flat map: { [category]: string[] }
+      const histAsMaps = histList.map((h: any) => {
+        const map: Record<string, string[]> = {}
+        const cats = Array.isArray(h?.categories) ? h.categories : []
+        for (const c of cats) {
+          const name = (c?.name ?? '').toString()
+          if (!name) continue
+          const attrs = Array.isArray(c?.top_user_attributes) ? c.top_user_attributes.map((x: any) => String(x)) : []
+          if (attrs.length) map[name] = Array.from(new Set(attrs))
+        }
+        return map
+      })
+
+      const combined = [...convList, ...histAsMaps]
+
+      if (combined.length === 0) {
         this.insightText = 'No saved insights found.'
       } else {
-        this.insightText = formatInsightsMarkdown(Array.isArray(saved) ? saved : [saved])
+        this.insightText = formatInsightsMarkdown(combined)
       }
     } catch (e) {
       console.warn('[assistant][insight] load saved failed:', e)
@@ -379,11 +414,38 @@ class MozAssistantChat extends LitElement {
 
   private async handleClearInsights() {
     try {
-      await browser.storage.local.set({ [LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]: [] })
+      await browser.storage.local.set({
+        [LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]: [],
+        [LocalStorageKeys.HISTORY_INSIGHTS]: [],
+      })
       this.insightText = ''
       this.insightLoading = false
     } catch (e) {
       console.warn('[assistant][insight] clear failed:', e)
+    }
+  }
+
+  private async handleGenerateHistoryInsight() {
+    if (this.insightLoading) return
+    this.insightLoading = true
+    try {
+      const json = await generateInsightsFromHistory()
+      // Convert to display map
+      const cats = Array.isArray(json?.categories) ? json.categories : []
+      const map: Record<string, string[]> = {}
+      for (const c of cats) {
+        const name = (c?.name ?? '').toString()
+        if (!name) continue
+        const attrs = Array.isArray(c?.top_user_attributes) ? c.top_user_attributes.map((x: any) => String(x)) : []
+        if (attrs.length) map[name] = Array.from(new Set(attrs))
+      }
+      this.insightText = formatInsightsMarkdown(map)
+    } catch (e) {
+      console.warn('[assistant][insight-history] generation failed:', e)
+      this.insightText = 'Failed to generate history insights.'
+    } finally {
+      this.insightLoading = false
+      this.updateComplete.then(() => this.scrollToBottom())
     }
   }
 

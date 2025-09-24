@@ -62,10 +62,11 @@ class MozHistoryInsights extends LitElement {
             const baseRows = await getRecentHistory({ days: 60, maxResults: 500 })
             const rows: ProfileRow[] = addWeights(baseRows, 14)
             const profile = generateProfileInputs(rows)
+            console.debug(`profile => ${JSON.stringify(profile)}`)
             const prompt = buildUserPrompt(profile)
             const out = await summarizeCategories(prompt)
             this.insights = out
-            console.debug('[MozHistory] insights:', out)
+            console.debug(`[MozHistory] insights: ${JSON.stringify(out)}`)
         } catch (e: any) {
             this.error = e?.message ?? String(e)
         } finally { this.isLoading = false }
