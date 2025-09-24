@@ -96,12 +96,11 @@ export function generateProfileInputs(rows: ProfileRow[]) {
 
 export function buildUserPrompt(profile: unknown): string {
     return [
-        'Use ONLY the provided browsing profile (no external knowledge) and AVOID any PII information.',
+        'Use ONLY the provided browsing profile (no external knowledge) and AVOID any PII information, IDs and gibberish information.',
         'Category is a concise topic name.',
-        'user_attribute are mostly entities, brand names, and some useful preferences (1 or 2 words).',
+        'user_attribute are mostly entities, brand names, category type and meaniningful useful preferences (1 or 2 words).',
         'For EACH category, include:',
-        '- top_domains: top 10 {domain, visit_sum} by descending visit_sum',
-        '- top_user_attributes: top 12 entities or brand names or preferences inferred from domains/titles;',
+        '- top_user_attributes: top 12 entities or brand names or category type or meaniningful preferences inferred from domains/titles;',
         '',
         "Let’s think step by step",
         'INPUT PROFILE:',
@@ -155,9 +154,8 @@ export const CATEGORY_OBJ = {
         },
         },
     top_user_attributes: { type: 'array', maxItems: 12, items: { type: 'string' } },
-    // insights: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string' } },
     },
-    required: ['name', 'top_domains', 'top_user_attributes'],
+    required: ['name', 'top_user_attributes'],
 } as const
 
 
@@ -326,10 +324,11 @@ class MozHistoryInsights extends LitElement {
             const baseRows = await getRecentHistory({ days: 60, maxResults: 500 })
             const rows: ProfileRow[] = addWeights(baseRows, 14)
             const profile = generateProfileInputs(rows)
+            console.debug(`profile => ${JSON.stringify(profile)}`)
             const prompt = buildUserPrompt(profile)
             const out = await summarizeCategories(prompt)
             this.insights = out
-            console.debug('[MozHistory] insights:', out)
+            console.debug(`[MozHistory] insights: ${JSON.stringify(out)}`)
         } catch (e: any) {
             this.error = e?.message ?? String(e)
         } finally { this.isLoading = false }
