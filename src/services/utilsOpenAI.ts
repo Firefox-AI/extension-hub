@@ -62,7 +62,7 @@ export async function chatComplete(params: {
   const result: any = await Promise.race([
     request,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('request-timeout')), params.timeoutMs ?? 15000),
+      setTimeout(() => reject(new Error('request-timeout')), params.timeoutMs ?? 90000),
     ),
   ])
   return result
