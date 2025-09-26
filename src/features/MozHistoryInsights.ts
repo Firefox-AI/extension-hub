@@ -68,6 +68,19 @@ function scoreToUnit(score: unknown): number {
   return Math.round(scaled * 1000) / 1000; // 3 decimals
 }
 
+type DurationBreakdown = {
+  total_ms: number
+  history_ms: number
+  prepare_ms: number
+  llm_ms: number
+  save_ms: number
+}
+
+function fmtMs(ms: number) {
+  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`
+}
+
+
 /**
  * Persist categories -> attributes with weights.
  * If model didn’t return scores, we fall back to equal weights.
@@ -423,12 +436,15 @@ class MozHistoryInsights extends LitElement {
     insights: any = null
     togetherKey = ''
 
+    genBreakdown: DurationBreakdown | null = null
+
     static properties = {
         isLoading: { type: Boolean },
         error: { type: String },
         historyPreview: { type: Array },
         insights: { type: Object },
         togetherKey: { type: String },
+        genBreakdown: { type: Object },
     }
 
     // Auto-run once the component is in the DOM
@@ -459,19 +475,57 @@ class MozHistoryInsights extends LitElement {
 
     private handleGenerateInsights = async () => {
         this.isLoading = true; this.error = null; this.insights = null
+         // phase timers
+         const t0 = performance.now();
+         let tHistory0 = t0, tHistory1 = t0;
+         let tPrep0 = t0, tPrep1 = t0;
+         let tLLM0 = t0, tLLM1 = t0;
+         let tSave0 = t0, tSave1 = t0;
         try {
-            const baseRows = await getRecentHistory({ days: 60, maxResults: 500 })
+            // HISTORY
+            tHistory0 = performance.now();
+            const baseRows = await getRecentHistory({ days: 60, maxResults: 500 });
+            tHistory1 = performance.now();
+
+            // PREP (weights, profile, prompt)
+            tPrep0 = performance.now();
             const rows: ProfileRow[] = addWeights(baseRows, 14)
             const profile = generateProfileInputs(rows)
-            console.debug(`profile => ${JSON.stringify(profile)}`)
+            // console.debug(`profile => ${JSON.stringify(profile)}`)
             const prompt = buildUserPrompt(profile)
+            tPrep1 = performance.now();
+
+            // LLM
+            tLLM0 = performance.now();
             const out = await summarizeCategories(prompt)
+            tLLM1 = performance.now();
+
             this.insights = out
             console.debug(`[MozHistory] insights: ${JSON.stringify(out)}`)
             await saveInsightsFromCategories(this.insights, 'local', 'history')
+
+            // SAVE
+            tSave0 = tLLM1;
+            tSave1 = performance.now();
         } catch (e: any) {
             this.error = e?.message ?? String(e)
-        } finally { this.isLoading = false }
+        } finally {
+          const tend = performance.now();
+          // ensure monotonicity in case of early failures
+          tHistory1 ||= tHistory0;
+          tPrep1 ||= tPrep0;
+          tLLM1 ||= tLLM0;
+          tSave1 ||= tend;
+
+          this.genBreakdown = {
+            total_ms: tend - t0,
+            history_ms: Math.max(0, tHistory1 - tHistory0),
+            prepare_ms: Math.max(0, tPrep1 - tPrep0),
+            llm_ms: Math.max(0, tLLM1 - tLLM0),
+            save_ms: Math.max(0, tSave1 - tSave0),
+          };
+          this.isLoading = false;
+        }
     }
 
     static styles = css`
@@ -492,6 +546,12 @@ class MozHistoryInsights extends LitElement {
 
     a {
       color: var(--color-link);
+    }
+
+    .duration {
+      margin-top: 8px;
+      font-size: 12px;
+      opacity: 0.9;
     }
 
     .wrapper {
@@ -696,6 +756,15 @@ class MozHistoryInsights extends LitElement {
                   ?disabled=${this.isLoading || !this.togetherKey}>
                   ${this.isLoading ? 'Analyzing...' : 'Generate Insights'}
                 </button>
+                ${this.genBreakdown ? html`
+                  <div class="duration">
+                    Last run: <b>${fmtMs(this.genBreakdown.total_ms)}</b>
+                    <span> (history ${fmtMs(this.genBreakdown.history_ms)},
+                    prep ${fmtMs(this.genBreakdown.prepare_ms)},
+                    model ${fmtMs(this.genBreakdown.llm_ms)},
+                    save ${fmtMs(this.genBreakdown.save_ms)})</span>
+                  </div>
+                ` : ''}
               </div>
       
               ${this.error ? html`<div class="error-message">${this.error}</div>` : ''}
