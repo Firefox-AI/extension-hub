@@ -217,10 +217,11 @@ export function generateProfileInputs(rows: ProfileRow[]) {
 
 export function buildUserPrompt(profile: unknown): string {
     return [
-        'Use ONLY the provided browsing profile (no external knowledge) and AVOID any PII information, IDs and gibberish information.',
+        'Use ONLY the provided browsing profile (no external knowledge) and AVOID any PII information, IDs, sensitive and gibberish information.',
         'Category is a concise topic name. dont miss any category if present',
         'user_attributes are mostly entities, brand names, category type and meaniningful useful preferences (1 or 2 words) and dont repeat the attributes',
         'avoid attributes that are generic and unreleated to category such as plain "google search"',
+        'avoid categories & attributes that are sensitive information such as user health and others',
         'For EACH category, include:',
         '- top_user_attributes: top 12 entities or brand names or category type or meaniningful preferences inferred from domains/titles;',
         '- scores: a parallel array (same length/order) of importance in [1,2,3,4,5], based on weighted_visits evidence for each attribute respectively.',
