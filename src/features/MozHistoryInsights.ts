@@ -12,6 +12,127 @@ export type HistoryRow = {
     title_sanitized: string
   }
 
+type InsightRecord = {
+    id: string               // UUID
+    category: string         // short name
+    user_attribute: string   // entity / attribute
+    weight: number           // 0..1
+    created_at: string       // ISO timestamp
+    source: 'history' | 'conversation' | 'dashboard' | string
+    is_blocked: boolean
+}
+  
+const STORAGE_KEY = 'moz_insight_records_v1'
+
+function norm(s: unknown): string {
+  return String(s ?? '').trim().toLowerCase()
+}
+
+function recKey(c: string, a: string): string {
+  return `${norm(c)}|${norm(a)}`
+}
+
+async function getStore(storageType: 'local' | 'sync' = 'local') {
+  return browser.storage[storageType]
+}
+
+export async function listInsights(
+  storageType: 'local' | 'sync' = 'local'
+): Promise<InsightRecord[]> {
+  const store = await getStore(storageType)
+  const obj = await store.get(STORAGE_KEY)
+  return (obj[STORAGE_KEY] as InsightRecord[] | undefined) ?? []
+}
+
+export async function setInsightBlocked(
+  id: string,
+  isBlocked: boolean,
+  storageType: 'local' | 'sync' = 'local'
+) {
+  const store = await getStore(storageType)
+  const current = await listInsights(storageType)
+  const next = current.map(r => (r.id === id ? { ...r, is_blocked: isBlocked } : r))
+  await store.set({ [STORAGE_KEY]: next })
+}
+
+export async function clearInsights(storageType: 'local' | 'sync' = 'local') {
+  const store = await getStore(storageType)
+  await store.set({ [STORAGE_KEY]: [] })
+}
+
+function scoreToUnit(score: unknown): number {
+  // clamp to [1,5], then scale by 0.2 → [0.2, 1.0]
+  const n = Number(score);
+  const clamped = Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : 3; // default mid if NaN
+  const scaled = clamped * 0.2;
+  return Math.round(scaled * 1000) / 1000; // 3 decimals
+}
+
+/**
+ * Persist categories -> attributes with weights.
+ * If model didn’t return scores, we fall back to equal weights.
+ */
+export async function saveInsightsFromCategories(
+  insights: any,
+  storageType: 'local' | 'sync' = 'local',
+  source: 'history' | 'conversation' | 'dashboard' | string = 'history'
+) {
+  const store = await getStore(storageType)
+  const existing = await listInsights(storageType)
+  console.debug(`existing = ${JSON.stringify(existing)}`)
+
+  // Build a map for dedupe
+  const map = new Map<string, InsightRecord>()
+  for (const r of existing) map.set(recKey(r.category, r.user_attribute), r)
+
+  const categories: any[] = Array.isArray(insights?.categories) ? insights.categories : []
+  const nowISO = new Date().toISOString()
+
+  for (const c of categories) {
+    const catName = String(c?.name ?? '').trim()
+    if (!catName) continue
+
+    const attrs: string[] = Array.isArray(c.top_user_attributes) ? c.top_user_attributes : []
+    const rawScores: unknown[] = Array.isArray(c.scores) ? c.scores : []
+
+    // If scores missing/misaligned, fallback to equal weights across attributes
+    const useScores = rawScores.length === attrs.length && attrs.length > 0;
+
+    attrs.forEach((attr, i) => {
+      // new weight from model: 1..5 → 0..1 via *0.2 (with clamp)
+      const newWeight = useScores
+        ? scoreToUnit(rawScores[i])
+        : (attrs.length ? Math.round((1 / attrs.length) * 1000) / 1000 : 0);
+
+      const key = recKey(catName, attr)
+      const prev = map.get(key)
+      const keepBlocked = prev?.is_blocked ?? false
+
+      // EMA: 80% existing + 20% new (or just new if none exists)
+      const blended = prev
+        ? (0.8 * prev.weight + 0.2 * newWeight)
+        : newWeight
+
+      const finalWeight = Math.max(0, Math.min(1, Math.round(blended * 1000) / 1000))
+
+      const next: InsightRecord = {
+        id: prev?.id ?? crypto.randomUUID(),
+        category: catName,
+        user_attribute: attr,
+        weight: finalWeight,
+        created_at: nowISO,   // last updated time; rename to updated_at if you prefer
+        source,
+        is_blocked: keepBlocked,
+      }
+
+      map.set(key, next)
+    })
+  }
+
+  const toSave = Array.from(map.values())
+  await store.set({ [STORAGE_KEY]: toSave })
+}
+
 export type ProfileRow = HistoryRow & {
     weight_score: number
     weighted_visits: number
@@ -97,10 +218,12 @@ export function generateProfileInputs(rows: ProfileRow[]) {
 export function buildUserPrompt(profile: unknown): string {
     return [
         'Use ONLY the provided browsing profile (no external knowledge) and AVOID any PII information, IDs and gibberish information.',
-        'Category is a concise topic name.',
-        'user_attribute are mostly entities, brand names, category type and meaniningful useful preferences (1 or 2 words).',
+        'Category is a concise topic name. dont miss any category if present',
+        'user_attributes are mostly entities, brand names, category type and meaniningful useful preferences (1 or 2 words) and dont repeat the attributes',
+        'avoid attributes that are generic and unreleated to category such as plain "google search"',
         'For EACH category, include:',
         '- top_user_attributes: top 12 entities or brand names or category type or meaniningful preferences inferred from domains/titles;',
+        '- scores: a parallel array (same length/order) of importance in [1,2,3,4,5], based on weighted_visits evidence for each attribute respectively.',
         '',
         "Let’s think step by step",
         'INPUT PROFILE:',
@@ -135,8 +258,17 @@ export async function togetherChat(args: TogetherChatArgs): Promise<any> {
     return resp.json()
 }
     
+// export const SYSTEM_MSG =
+//     'You are a precise data analyst. Return ONLY a single JSON object that matches the schema. No code fences, no commentary.'
+
 export const SYSTEM_MSG =
-    'You are a precise data analyst. Return ONLY a single JSON object that matches the schema. No code fences, no commentary.'
+  `You are a precise data analyst.
+    Return ONLY a single JSON object that matches the schema.
+    Do NOT use object keys as category names; each category MUST be an object with a "name" string.
+    Example:
+    {"categories":[{"name":"Sports","top_user_attributes":["Cleats", "Sportscheck", "Adidas", "soccer", "shoesize 6" ], "scores":[5, 2, 3, 5, 3 ]}]}`
+
+    // {"categories":[{"name":"Sports","top_user_attributes":["Cleats", "Sportscheck", "Adidas", "soccer", "shoesize 6" ]}]}`
 
 export const CATEGORY_OBJ = {
     type: 'object',
@@ -154,8 +286,9 @@ export const CATEGORY_OBJ = {
         },
         },
     top_user_attributes: { type: 'array', maxItems: 12, items: { type: 'string' } },
+    scores: { type: 'array', maxItems: 12, items: { type: 'number' } },
     },
-    required: ['name', 'top_user_attributes'],
+    required: ['name', 'top_user_attributes', 'scores'],
 } as const
 
 
@@ -169,16 +302,18 @@ export const CATEGORY_ARRAY_SCHEMA = {
 } as const
 
 
-export async function summarizeCategories(profileText: string, model = 'Qwen/Qwen3-235B-A22B-Thinking-2507') {
+// export async function summarizeCategories(profileText: string, model = 'Qwen/Qwen3-235B-A22B-Thinking-2507') {
+export async function summarizeCategories(profileText: string, model = 'mistralai/Mistral-Small-24B-Instruct-2501') {
     const resp = await togetherChat({
         model,
         temperature: 0.1,
         max_tokens: 4000,
-        response_format: { type: 'json_schema', schema: CATEGORY_ARRAY_SCHEMA },
+        response_format: { type: 'json_schema', schema: CATEGORY_ARRAY_SCHEMA, strict: true },
         messages: [ { role: 'system', content: SYSTEM_MSG }, { role: 'user', content: profileText } ],
     })
     const raw = resp?.choices?.[0]?.message?.content ?? ''
     const json = extractJSON(raw)
+    console.debug('[schema]', JSON.stringify(CATEGORY_ARRAY_SCHEMA))
     // Retry if collapsed into one bucket
     if (!Array.isArray(json?.categories) || json.categories.length < 3) {
         const nudged = await togetherChat({
@@ -189,7 +324,9 @@ export async function summarizeCategories(profileText: string, model = 'Qwen/Qwe
             messages: [
                 { role: 'system', content: SYSTEM_MSG },
                 { role: 'user', content: profileText },
-                { role: 'user', content: 'The previous attempt merged everything into one category. Now produce 3–8 distinct categories, strictly following the schema.' },
+                // { role: 'user', content: `The previous attempt merged everything into one category. \n
+                //                          'Now produce 3–10 distinct categories without duplicating attributes across categories, \n
+                //                          'making sure attributes are relevant to the category and strictly following the schema.` },
             ],
         })
         return extractJSON(nudged?.choices?.[0]?.message?.content ?? '{}')
@@ -254,7 +391,8 @@ export function extractJSON(text: string): any {
     const maxResults = opts?.maxResults ?? 1000
     const startTime = Date.now() - days * 86400 * 1000
   
-    const items = await browser.history.search({ text, startTime, maxResults })
+    // const items = await browser.history.search({ text, startTime, maxResults })
+    const items = (await browser.history.search({ text, startTime, maxResults })).filter(it => (it.title ?? '').trim().length > 0)
     console.debug(`items = ${items.length}`);
   
     const rows: HistoryRow[] = items.map((it) => {
@@ -329,6 +467,7 @@ class MozHistoryInsights extends LitElement {
             const out = await summarizeCategories(prompt)
             this.insights = out
             console.debug(`[MozHistory] insights: ${JSON.stringify(out)}`)
+            await saveInsightsFromCategories(this.insights, 'local', 'history')
         } catch (e: any) {
             this.error = e?.message ?? String(e)
         } finally { this.isLoading = false }
