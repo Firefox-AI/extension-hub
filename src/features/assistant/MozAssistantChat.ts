@@ -20,6 +20,8 @@ class MozAssistantChat extends LitElement {
   private boundOnActivated?: () => void
   private boundOnUpdated?: (tabId: number, changeInfo: any) => void
   autoSearchSummarize: boolean = false
+  private currentTabId?: number
+  private currentUrl: string = ''
 
   static properties = {
     messages: { type: Array },
@@ -49,6 +51,11 @@ class MozAssistantChat extends LitElement {
   async init() {
     await assistantStore.load()
     this.messages = assistantStore.getAll()
+    try {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
+      this.currentTabId = tab?.id
+      this.currentUrl = tab?.url || ''
+    } catch (_) {}
     try {
       const { assistant_auto_search_summarize } = await browser.storage.local.get(
         LocalStorageKeys.ASSISTANT_AUTO_SEARCH_SUMMARIZE,
@@ -328,13 +335,67 @@ class MozAssistantChat extends LitElement {
   
 
   private onTabEvent() {
-    this.refreshQuickPrompts()
+    ;(async () => {
+      try {
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
+        this.currentTabId = tab?.id
+        this.currentUrl = tab?.url || ''
+        await assistantStore.load()
+        this.messages = assistantStore.getAll()
+      } catch (_) {}
+      this.refreshQuickPrompts()
+      this.updateComplete.then(() => this.scrollToBottom())
+    })()
   }
 
   private onTabUpdated(_tabId: number, changeInfo: any) {
-    if (changeInfo?.status === 'complete' || changeInfo?.url) {
+    ;(async () => {
+      try {
+        const [active] = await browser.tabs.query({ active: true, currentWindow: true })
+        if (!active) return
+        const isActiveUpdated = _tabId === active.id
+        const newUrl: string | undefined = changeInfo?.url
+        if (isActiveUpdated && newUrl && newUrl !== this.currentUrl) {
+          // Migrate stored keys from old URL -> new URL
+          const res: any = await browser.storage.local.get([
+            LocalStorageKeys.CHAT_HISTORY,
+            LocalStorageKeys.CHAT_TOKENS,
+          ])
+          let histMap = res?.[LocalStorageKeys.CHAT_HISTORY]
+          let tokenMap = res?.[LocalStorageKeys.CHAT_TOKENS]
+          if (!histMap || typeof histMap !== 'object' || Array.isArray(histMap)) histMap = {}
+          if (!tokenMap || typeof tokenMap !== 'object' || Array.isArray(tokenMap)) tokenMap = {}
+
+          const oldMsgs = Array.isArray(histMap[this.currentUrl]) ? histMap[this.currentUrl] : []
+          const oldTokens = Array.isArray(tokenMap[this.currentUrl]) ? tokenMap[this.currentUrl] : []
+          const newMsgs = Array.isArray(histMap[newUrl]) ? histMap[newUrl] : []
+          const newTokens = Array.isArray(tokenMap[newUrl]) ? tokenMap[newUrl] : []
+
+          if (oldMsgs.length && (!newMsgs.length)) {
+            histMap[newUrl] = oldMsgs
+            delete histMap[this.currentUrl]
+          }
+          if (oldTokens.length && (!newTokens.length)) {
+            tokenMap[newUrl] = oldTokens
+            delete tokenMap[this.currentUrl]
+          }
+          await browser.storage.local.set({
+            [LocalStorageKeys.CHAT_HISTORY]: histMap,
+            [LocalStorageKeys.CHAT_TOKENS]: tokenMap,
+          })
+
+          this.currentUrl = newUrl
+          await assistantStore.load()
+          this.messages = assistantStore.getAll()
+        } else if (changeInfo?.status === 'complete') {
+          // Just refresh to reflect any page-derived context changes
+          await assistantStore.load()
+          this.messages = assistantStore.getAll()
+        }
+      } catch (_) {}
       this.refreshQuickPrompts()
-    }
+      this.updateComplete.then(() => this.scrollToBottom())
+    })()
   }
 
   private async refreshQuickPrompts() {

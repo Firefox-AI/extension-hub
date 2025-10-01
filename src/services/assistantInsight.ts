@@ -14,7 +14,7 @@ Inputs:
 - current_tab: JSON object with the user's currently active tab context (url, title, optional description). Use only if relevant.
 
 Goal:
-- Identify stable, explicit categories and their attributes mentioned by the user (e.g., categories like dietary, brands, frameworks, hobbies; attributes are detailed entities under that category including polarity if essential).
+- Identify stable, explicit categories and their attributes/factual information mentioned by the user (e.g., categories like dietary, brands, frameworks, hobbies; attributes are detailed entities under that category including polarity if essential).
 - Be conservative; only include categories/attributes with strong evidence from the user queries.
 
 For example, category can be "Diet Preferences" and one of the values can be "avoid broccoli" where avoid is polarity and broccoli is the entity.

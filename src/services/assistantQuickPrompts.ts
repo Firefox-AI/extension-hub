@@ -68,7 +68,7 @@ const formatJson = (obj: any) => {
   }
 }
 
-async function generateQuickPromptsFromPrompt(filled: string, n: number): Promise<string[]> {
+async function generateQuickPrompts(filled: string, n: number): Promise<string[]> {
   const { togetherai_url, togetherai_api_key, togetherai_model } = await browser.storage.local.get([
     LocalStorageKeys.TOGETHERAI_URL,
     LocalStorageKeys.TOGETHERAI_API_KEY,
@@ -99,7 +99,7 @@ async function generateQuickPromptsFromPrompt(filled: string, n: number): Promis
       { role: 'user', content: filled },
     ] as any,
     response_format: { type: 'json_object', schema: QUICK_PROMPTS_SCHEMA },
-    timeoutMs: 15000,
+    timeoutMs: 30000,
   })
 
   const text = ((result as any).choices?.[0]?.message?.content || '').trim()
@@ -172,7 +172,7 @@ export async function getQuickPrompts(n: number = 2): Promise<string[]> {
       .replace('{n}', String(n))
       .replace('{date}', today)
 
-    return await generateQuickPromptsFromPrompt(filled, n)
+    return await generateQuickPrompts(filled, n)
   } catch (e) {
     console.warn('[assistant][quick-prompts] failed:', e)
     return []
@@ -190,7 +190,7 @@ export async function getQuickPromptsInConversation(history: ChatMessage[], n: n
       .replace('{conversation}', JSON.stringify(convo))
       .replace('{n}', String(n))
       .replace('{date}', today)
-    return await generateQuickPromptsFromPrompt(filled, n)
+    return await generateQuickPrompts(filled, n)
   } catch (e) {
     console.warn('[assistant][quick-prompts][in-convo] failed:', e)
     return []

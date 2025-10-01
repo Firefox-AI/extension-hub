@@ -19,14 +19,42 @@ export class AssistantStore {
   }
 
   async load() {
-    const { chat_history } = await browser.storage.local.get(
-      LocalStorageKeys.CHAT_HISTORY,
-    )
-    const { chat_tokens } = await browser.storage.local.get(
-      LocalStorageKeys.CHAT_TOKENS,
-    )
-    this.messages = chat_history || []
-    this.tokenUsages = Array.isArray(chat_tokens) ? chat_tokens : []
+    const tab = await get_current_tab({})
+    const url = (tab?.url || '') as string
+
+    const resHist: any = await browser.storage.local.get(LocalStorageKeys.CHAT_HISTORY)
+    let histVal: any = resHist?.[LocalStorageKeys.CHAT_HISTORY]
+
+    let migratedHistory = false
+    let historyMap: Record<string, ChatMessage[]> = {}
+    if (Array.isArray(histVal)) {
+      // Backward-compat: old format was a flat array for a single conversation
+      historyMap = { [url]: histVal as ChatMessage[] }
+      migratedHistory = true
+    } else if (histVal && typeof histVal === 'object') {
+      historyMap = histVal as Record<string, ChatMessage[]>
+    }
+
+    const resTokens: any = await browser.storage.local.get(LocalStorageKeys.CHAT_TOKENS)
+    let tokenVal: any = resTokens?.[LocalStorageKeys.CHAT_TOKENS]
+    let migratedTokens = false
+    let tokenMap: Record<string, Array<{ prompt: number; completion: number; total: number }>> = {}
+    if (Array.isArray(tokenVal)) {
+      tokenMap = { [url]: tokenVal as Array<{ prompt: number; completion: number; total: number }> }
+      migratedTokens = true
+    } else if (tokenVal && typeof tokenVal === 'object') {
+      tokenMap = tokenVal as Record<string, Array<{ prompt: number; completion: number; total: number }>>
+    }
+
+    this.messages = Array.isArray(historyMap[url]) ? historyMap[url] : []
+    this.tokenUsages = Array.isArray(tokenMap[url]) ? tokenMap[url] : []
+
+    if (migratedHistory || migratedTokens) {
+      const payload: any = {}
+      if (migratedHistory) payload[LocalStorageKeys.CHAT_HISTORY] = historyMap
+      if (migratedTokens) payload[LocalStorageKeys.CHAT_TOKENS] = tokenMap
+      try { await browser.storage.local.set(payload) } catch (_) {}
+    }
     return this.messages
   }
 
@@ -35,25 +63,46 @@ export class AssistantStore {
   }
 
   async setAll(messages: ChatMessage[]) {
+    const tab = await get_current_tab({})
+    const url = (tab?.url || '') as string
     this.messages = messages
-    await browser.storage.local.set({
-      [LocalStorageKeys.CHAT_HISTORY]: this.messages,
-    })
+    const res: any = await browser.storage.local.get(LocalStorageKeys.CHAT_HISTORY)
+    let map = res?.[LocalStorageKeys.CHAT_HISTORY]
+    if (!map || typeof map !== 'object' || Array.isArray(map)) map = {}
+    map[url] = this.messages
+    await browser.storage.local.set({ [LocalStorageKeys.CHAT_HISTORY]: map })
   }
 
   async append(message: ChatMessage) {
+    const tab = await get_current_tab({})
+    const url = (tab?.url || '') as string
     this.messages = [...this.messages, { ...message, ts: Date.now() }]
-    await browser.storage.local.set({
-      [LocalStorageKeys.CHAT_HISTORY]: this.messages,
-    })
+    const res: any = await browser.storage.local.get(LocalStorageKeys.CHAT_HISTORY)
+    let map = res?.[LocalStorageKeys.CHAT_HISTORY]
+    if (!map || typeof map !== 'object' || Array.isArray(map)) map = {}
+    map[url] = this.messages
+    await browser.storage.local.set({ [LocalStorageKeys.CHAT_HISTORY]: map })
   }
 
   async clear() {
+    const tab = await get_current_tab({})
+    const url = (tab?.url || '') as string
     this.messages = []
     this.tokenUsages = []
+
+    const res: any = await browser.storage.local.get([
+      LocalStorageKeys.CHAT_HISTORY,
+      LocalStorageKeys.CHAT_TOKENS,
+    ])
+    let histMap = res?.[LocalStorageKeys.CHAT_HISTORY]
+    let tokenMap = res?.[LocalStorageKeys.CHAT_TOKENS]
+    if (!histMap || typeof histMap !== 'object' || Array.isArray(histMap)) histMap = {}
+    if (!tokenMap || typeof tokenMap !== 'object' || Array.isArray(tokenMap)) tokenMap = {}
+    histMap[url] = []
+    tokenMap[url] = []
     await browser.storage.local.set({
-      [LocalStorageKeys.CHAT_HISTORY]: [],
-      [LocalStorageKeys.CHAT_TOKENS]: [],
+      [LocalStorageKeys.CHAT_HISTORY]: histMap,
+      [LocalStorageKeys.CHAT_TOKENS]: tokenMap,
     })
   }
 
@@ -62,13 +111,19 @@ export class AssistantStore {
   }
 
   async addTokenUsage(usage: { prompt?: number; completion?: number; total?: number }) {
+    const tab = await get_current_tab({})
+    const url = (tab?.url || '') as string
     const u = {
       prompt: usage.prompt ?? 0,
       completion: usage.completion ?? 0,
       total: usage.total ?? (usage.prompt ?? 0) + (usage.completion ?? 0),
     }
     this.tokenUsages = [...this.tokenUsages, u]
-    await browser.storage.local.set({ [LocalStorageKeys.CHAT_TOKENS]: this.tokenUsages })
+    const res: any = await browser.storage.local.get(LocalStorageKeys.CHAT_TOKENS)
+    let map = res?.[LocalStorageKeys.CHAT_TOKENS]
+    if (!map || typeof map !== 'object' || Array.isArray(map)) map = {}
+    map[url] = this.tokenUsages
+    await browser.storage.local.set({ [LocalStorageKeys.CHAT_TOKENS]: map })
   }
 }
 
