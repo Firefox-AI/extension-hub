@@ -36,6 +36,7 @@ export type mlBrowserT = {
     setFirefoxViewOverride: (enabled: boolean) => Promise<boolean>
     updateUIForAIMode: (enabled: boolean) => Promise<boolean>
     getLastFocusedUrl: () => Promise<string | null>
+    getWeatherCity: () => Promise<string | null>
     closeSidebar: () => Promise<boolean>
   }
   trial?: {

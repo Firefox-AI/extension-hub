@@ -183,6 +183,18 @@ export async function search_history(args: { search_term: string }) {
   return []
 }
 
+// Returns the Weather city from Activity Stream state, if available.
+export async function get_weather_city(): Promise<string | null> {
+  try {
+    // Exposed via experiment API in src/api.ts
+    // @ts-ignore - experiment API typings are not available
+    const city = await (browser as any).extensionHub?.getWeatherCity?.()
+    return city ?? null
+  } catch (_) {
+    return null
+  }
+}
+
 async function getDescriptionForTab(tabId?: number) {
   if (!tabId) return ''
   try {

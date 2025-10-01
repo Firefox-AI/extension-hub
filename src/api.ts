@@ -521,6 +521,20 @@ export default class extends ExtensionAPI {
           }
         },
 
+        async getWeatherCity(): Promise<string | null> {
+          try {
+            // Access Activity Stream Redux state from AboutNewTab
+            const city =
+              lazy.AboutNewTab?.activityStream?.store
+                ?.getState?.()
+                ?.Weather?.locationData?.city || null
+            return city ?? null
+          } catch (error) {
+            console.error('Failed to get weather city:', error)
+            return null
+          }
+        },
+
         async getLastFocusedUrl(): Promise<string | null> {
           const window = Services.wm.getMostRecentBrowserWindow()
           const urlbar = window.gURLBar

@@ -147,6 +147,12 @@
       },
       {
         "async": true,
+        "name": "getWeatherCity",
+        "parameters": [],
+        "type": "function"
+      },
+      {
+        "async": true,
         "name": "closeSidebar",
         "parameters": [],
         "type": "function"
