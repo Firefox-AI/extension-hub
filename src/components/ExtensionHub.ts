@@ -10,12 +10,14 @@ type FeatureOption = {
     | 'chat'
     | 'conversational_onboarding'
     | 'extensionhub_dashboard'
+    | 'history_insights'
     | 'page_qa'
     | 'page_summarization'
     | 'plan_checklist'
     | 'tab_summarization'
     | 'planner'
     | 'tabs_debug'
+    | 'assistant_chat'
   label: string
   component: () => unknown
 }
@@ -64,6 +66,11 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     component: () => html`<moz-planner></moz-planner>`,
   },
   {
+    value: 'assistant_chat',
+    label: 'Assistant Chat',
+    component: () => html`<moz-assistant-chat></moz-assistant-chat>`,
+  },
+  {
     value: 'plan_checklist',
     label: 'Planner Checklist',
     component: () => html`<moz-plan-checklist></moz-plan-checklist>`,
@@ -73,6 +80,12 @@ const FEATURE_OPTIONS: FeatureOption[] = [
     label: 'Attribute Comparison',
     component: () =>
       html`<moz-attribute-comparison></moz-attribute-comparison>`,
+  },
+  {
+    value: 'history_insights',
+    label: 'History Insights',
+    component: () =>
+      html`<moz-history-insights></moz-history-insights>`,
   },
   {
     value: 'tabs_debug',

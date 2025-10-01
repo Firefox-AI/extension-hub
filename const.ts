@@ -17,6 +17,7 @@ export enum LocalStorageKeys {
   ENGINE_CREATED = 'engine_created',
   IS_LOCAL_AI_ENABLED = 'is_local_ai_enabled',
   // TogeatherAI
+  TOGETHERAI_URL = 'togetherai_url',
   TOGETHERAI_API_KEY = 'togetherai_api_key',
   TOGETHERAI_MODEL = 'togetherai_model',
   // Local Model
@@ -30,10 +31,18 @@ export enum LocalStorageKeys {
 
   // Chat
   CHAT_HISTORY = 'chat_history',
+  CHAT_TOKENS = 'chat_tokens',
 
   // AI Mode
   AI_MODE_CHATS = 'ai_mode_chats',
   AI_MODE_PERSISTENCE_MODE = 'ai_mode_persistence_mode',
+
+  // Assistant behavior
+  ASSISTANT_AUTO_SEARCH_SUMMARIZE = 'assistant_auto_search_summarize',
+
+  // Assistant insights
+  ASSISTANT_CONVERSATION_INSIGHTS = 'assistant_conversation_insights',
+  HISTORY_INSIGHTS = 'histroy_insights',
 }
 
 export enum SessionStorageKeys {

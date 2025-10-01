@@ -28,6 +28,7 @@ class ExtensionHubSettings extends LitElement {
   huggingFaceProvider: string = ''
   openAiApikey: string = ''
   openAiModel: string = defaultOpenAiModel
+  togetherAiUrl: string = ''
   togetherAiApiKey: string = ''
   togetherAiModel: string = defaultTogetherAiModel
   localModelUrl: string = ''
@@ -47,6 +48,7 @@ class ExtensionHubSettings extends LitElement {
     huggingFaceProvider: { type: String },
     openAiApikey: { type: String },
     openAiModel: { type: String },
+    togetherAiUrl: { type: String },
     togetherAiApikey: { type: String },
     togeatherAiModel: { type: String },
     localModelUrl: { type: String },
@@ -77,6 +79,7 @@ class ExtensionHubSettings extends LitElement {
       openai_ai_model,
       openai_api_key,
       engine_metadata,
+      togetherai_url,
       togetherai_api_key,
       togetherai_model,
       local_model_url,
@@ -88,6 +91,7 @@ class ExtensionHubSettings extends LitElement {
       LocalStorageKeys.OPENAI_API_KEY,
       LocalStorageKeys.OPENAI_AI_MODEL,
       LocalStorageKeys.ENGINE_METADATA,
+      LocalStorageKeys.TOGETHERAI_URL,
       LocalStorageKeys.TOGETHERAI_API_KEY,
       LocalStorageKeys.TOGETHERAI_MODEL,
       LocalStorageKeys.LOCAL_MODEL_URL,
@@ -98,6 +102,7 @@ class ExtensionHubSettings extends LitElement {
     this.huggingFaceProvider = hugging_face_provider || ''
     this.openAiApikey = openai_api_key || ''
     this.openAiModel = openai_ai_model || defaultOpenAiModel
+    this.togetherAiUrl = togetherai_url || ''
     this.togetherAiApiKey = togetherai_api_key || ''
     this.togetherAiModel = togetherai_model || defaultTogetherAiModel
     this.localModelUrl = local_model_url || ''
@@ -200,6 +205,12 @@ class ExtensionHubSettings extends LitElement {
   /**
    * TOGETHERAI SETTINGS
    */
+  handleTogetherAIUrlInput(event: Event) {
+    const input = event.target as HTMLSelectElement
+    browser.storage.local.set({ togetherai_url: input.value })
+    this.togetherAiUrl = input.value
+  }
+
   handleTogetherAIApiKeyInput(event: Event) {
     const input = event.target as HTMLSelectElement
     browser.storage.local.set({ togetherai_api_key: input.value })
@@ -327,6 +338,16 @@ class ExtensionHubSettings extends LitElement {
         <div class="card">
           <h3>Together AI</h3>
           <div class="fields">
+            <div>
+              <label class="label">URL</label>
+              <input
+                type="text"
+                placeholder="Together AI URL"
+                class="text-input"
+                value="${this.togetherAiUrl || ''}"
+                @input="${this.handleTogetherAIUrlInput}"
+              />
+            </div>
             <div>
               <label class="label">API Key</label>
               <input
