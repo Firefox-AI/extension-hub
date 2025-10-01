@@ -86,8 +86,7 @@ export async function generateInsightsFromConversation(history: ChatMessage[]): 
         { role: 'system', content: 'Return only valid JSON that matches the provided schema.' },
         { role: 'user', content: filled },
       ] as any,
-      response_format: { type: 'json_object', schema: SCHEMA },
-      timeoutMs: 15000,
+      response_format: { type: 'json_object', schema: SCHEMA }
     })
 
     const text = ((result as any).choices?.[0]?.message?.content || '').trim()

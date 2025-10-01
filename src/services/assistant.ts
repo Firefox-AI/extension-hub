@@ -166,8 +166,7 @@ export class AssistantService {
           model: this.modelId,
           // @ts-ignore
           messages: convo as any,
-          tools: assistantTools as any,
-          timeoutMs: 30000,
+          tools: assistantTools as any
         })
       } catch (err) {
         console.warn('[assistant] Together request failed:', err)
