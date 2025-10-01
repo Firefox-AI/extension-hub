@@ -49,6 +49,7 @@ export async function chatComplete(params: {
   timeoutMs?: number
   includeRaw?: boolean
 }): Promise<ChatResultLite> {
+  const { timeoutMs = 90000 } = params;
   const client = getOpenAIClient()
   const request = client.chat.completions.create({
     model: params.model,
@@ -62,7 +63,7 @@ export async function chatComplete(params: {
   const result: any = await Promise.race([
     request,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('request-timeout')), params.timeoutMs ?? 90000),
+      setTimeout(() => reject(new Error('request-timeout')), timeoutMs),
     ),
   ])
   return result
