@@ -16,6 +16,9 @@ class MozChat extends LitElement {
   loading = false
   hasSystemMessage = true // disabling this for the time being -- see not below
   tinyMark: TinyMark
+  private currentUrl: string = ''
+  private boundOnActivated?: () => void
+  private boundOnUpdated?: (tabId: number, changeInfo: any) => void
 
   static get properties() {
     return {
@@ -38,6 +41,10 @@ class MozChat extends LitElement {
     super.connectedCallback()
     this.loadHistory()
     browser.runtime.onMessage.addListener(this.handleIncomingMessage)
+    this.boundOnActivated = () => this.onTabEvent()
+    this.boundOnUpdated = (tabId: number, changeInfo: any) => this.onTabUpdated(tabId, changeInfo)
+    browser.tabs.onActivated.addListener(this.boundOnActivated)
+    browser.tabs.onUpdated.addListener(this.boundOnUpdated)
   }
 
   handleIncomingMessage = async (message: any) => {
@@ -76,13 +83,32 @@ class MozChat extends LitElement {
     return pageContent
   }
 
+  // helper to get the current active tab URL
+  private async getCurrentUrl(): Promise<string> {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
+    return tab?.url || ''
+  }
+
   // Load stored chat history from browser.storage.local
   async loadHistory() {
     try {
+      const url = await this.getCurrentUrl()
+      this.currentUrl = url
       const { chat_history } = await browser.storage.local.get(
         LocalStorageKeys.CHAT_HISTORY,
-      )
-      this.messages = chat_history ? chat_history : []
+      ) as any
+      const val = (chat_history as any)
+      if (Array.isArray(val)) {
+        // Backward-compat: migrate flat array to per-URL map
+        this.messages = val
+        try {
+          await browser.storage.local.set({ [LocalStorageKeys.CHAT_HISTORY]: { [url]: val } })
+        } catch (_) {}
+      } else if (val && typeof val === 'object') {
+        this.messages = Array.isArray(val[url]) ? val[url] : []
+      } else {
+        this.messages = []
+      }
       this.updateComplete.then(() => {
         this.handleScrollToBottom()
       })
@@ -91,11 +117,77 @@ class MozChat extends LitElement {
     }
   }
 
+  private onTabEvent() {
+    ;(async () => {
+      try {
+        const url = await this.getCurrentUrl()
+        this.currentUrl = url
+        await this.loadHistory()
+      } catch (_) {}
+    })()
+  }
+
+  private onTabUpdated(_tabId: number, changeInfo: any) {
+    ;(async () => {
+      try {
+        const [active] = await browser.tabs.query({ active: true, currentWindow: true })
+        if (!active) return
+        const isActiveUpdated = _tabId === active.id
+        const newUrl: string | undefined = changeInfo?.url
+        if (isActiveUpdated && newUrl && newUrl !== this.currentUrl) {
+          const res: any = await browser.storage.local.get([
+            LocalStorageKeys.CHAT_HISTORY,
+            LocalStorageKeys.CHAT_TOKENS,
+          ])
+          let histMap = res?.[LocalStorageKeys.CHAT_HISTORY]
+          let tokenMap = res?.[LocalStorageKeys.CHAT_TOKENS]
+          if (!histMap || typeof histMap !== 'object' || Array.isArray(histMap)) histMap = {}
+          if (!tokenMap || typeof tokenMap !== 'object' || Array.isArray(tokenMap)) tokenMap = {}
+
+          const oldMsgs = Array.isArray(histMap[this.currentUrl]) ? histMap[this.currentUrl] : []
+          const oldTokens = Array.isArray(tokenMap[this.currentUrl]) ? tokenMap[this.currentUrl] : []
+          const newMsgs = Array.isArray(histMap[newUrl]) ? histMap[newUrl] : []
+          const newTokens = Array.isArray(tokenMap[newUrl]) ? tokenMap[newUrl] : []
+
+          if (oldMsgs.length && (!newMsgs.length)) {
+            histMap[newUrl] = oldMsgs
+            delete histMap[this.currentUrl]
+          }
+          if (oldTokens.length && (!newTokens.length)) {
+            tokenMap[newUrl] = oldTokens
+            delete tokenMap[this.currentUrl]
+          }
+          await browser.storage.local.set({
+            [LocalStorageKeys.CHAT_HISTORY]: histMap,
+            [LocalStorageKeys.CHAT_TOKENS]: tokenMap,
+          })
+          this.currentUrl = newUrl
+          await this.loadHistory()
+        } else if (changeInfo?.status === 'complete') {
+          await this.loadHistory()
+        }
+      } catch (_) {}
+    })()
+  }
+
   // Persist chat history whenever messages change
-  updated() {
-    browser.storage.local
-      .set({ [LocalStorageKeys.CHAT_HISTORY]: this.messages })
-      .catch(console.error)
+  async updated() {
+    try {
+      const url = this.currentUrl || (await this.getCurrentUrl())
+      const res: any = await browser.storage.local.get(LocalStorageKeys.CHAT_HISTORY)
+      let map = res?.[LocalStorageKeys.CHAT_HISTORY]
+      if (!map || typeof map !== 'object' || Array.isArray(map)) map = {}
+      map[url] = this.messages
+      await browser.storage.local.set({ [LocalStorageKeys.CHAT_HISTORY]: map })
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  disconnectedCallback(): void {
+    if (this.boundOnActivated) browser.tabs.onActivated.removeListener(this.boundOnActivated)
+    if (this.boundOnUpdated) browser.tabs.onUpdated.removeListener(this.boundOnUpdated)
+    super.disconnectedCallback()
   }
 
   // Called when the user clicks Send or presses Enter
@@ -105,9 +197,16 @@ class MozChat extends LitElement {
 
     // Add user bubble
     this.messages = [...this.messages, { role: 'user', content: text }]
-    browser.storage.local
-      .set({ [LocalStorageKeys.CHAT_HISTORY]: this.messages })
-      .catch(console.error)
+    try {
+      const url = this.currentUrl || (await this.getCurrentUrl())
+      const res: any = await browser.storage.local.get(LocalStorageKeys.CHAT_HISTORY)
+      let map = res?.[LocalStorageKeys.CHAT_HISTORY]
+      if (!map || typeof map !== 'object' || Array.isArray(map)) map = {}
+      map[url] = this.messages
+      await browser.storage.local.set({ [LocalStorageKeys.CHAT_HISTORY]: map })
+    } catch (e) {
+      console.error(e)
+    }
     this.inputValue = ''
     this.loading = true
 
@@ -175,9 +274,18 @@ class MozChat extends LitElement {
   handleClearChat() {
     this.messages = []
     this.inputValue = ''
-    browser.storage.local
-      .set({ [LocalStorageKeys.CHAT_HISTORY]: [] })
-      .catch(console.error)
+    ;(async () => {
+      try {
+        const url = this.currentUrl || (await this.getCurrentUrl())
+        const res: any = await browser.storage.local.get(LocalStorageKeys.CHAT_HISTORY)
+        let map = res?.[LocalStorageKeys.CHAT_HISTORY]
+        if (!map || typeof map !== 'object' || Array.isArray(map)) map = {}
+        map[url] = []
+        await browser.storage.local.set({ [LocalStorageKeys.CHAT_HISTORY]: map })
+      } catch (e) {
+        console.error(e)
+      }
+    })()
   }
 
   render() {
