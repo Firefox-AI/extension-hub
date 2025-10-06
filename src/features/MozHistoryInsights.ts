@@ -7,9 +7,11 @@ import {
   summarizeCategories,
   getExistingInsights,
   saveInsightsFromCategories,
-  type HistoryRow,
   type ProfileRow,
 } from '../services/historyInsight'
+import {
+  getUserChats,
+} from '../services/chatInsight'
 import { LocalStorageKeys } from '../../const'
 
 
@@ -74,13 +76,16 @@ class MozHistoryInsights extends LitElement {
             console.debug('[MozHistory] baseRows:', baseRows.length)
             tHistory1 = performance.now();
 
+            const chatHistory = await getUserChats({ days: 30, maxConversations: 50, halfLifeDays: 14 });
+            console.debug(`[ChatHistory] ${JSON.stringify(chatHistory)}`)
+
             // PREP (weights, profile, prompt)
             tPrep0 = performance.now();
             const rows: ProfileRow[] = addWeights(baseRows, 14)
             const profile = generateProfileInputs(rows)
             // console.debug(`profile => ${JSON.stringify(profile)}`)
             const existing = await getExistingInsights('local')
-            const prompt = buildUserPrompt(profile, existing)
+            const prompt = buildUserPrompt(profile, existing, 'history')
             promptWordCount = countWords(prompt)
             tPrep1 = performance.now();
 
@@ -91,7 +96,15 @@ class MozHistoryInsights extends LitElement {
 
             this.insights = out
             console.debug(`[MozHistory] insights: ${JSON.stringify(out)}`)
+
+            const promptChat = buildUserPrompt(chatHistory, existing, 'conversation')
+            const outChat = await summarizeCategories(promptChat)
+
+            console.debug(`[ChatHistory] insights: ${JSON.stringify(outChat)}`)
+
+            // persistence logic
             await saveInsightsFromCategories(this.insights, 'local', 'history')
+            await saveInsightsFromCategories(outChat, 'local', 'conversation')
             // refresh the cached view so reopening the panel shows latest data
             await this.loadSavedInsights()
 

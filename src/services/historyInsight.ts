@@ -11,7 +11,7 @@ export type HistoryRow = {
   title_sanitized: string
 }
 
-type InsightRecord = {
+export type InsightRecord = {
     id: string               // category + "_" + user_attribute
     category: string         // short name
     user_attribute: string   // entity / attribute
@@ -78,6 +78,16 @@ export async function getExistingInsights(
 }
 
 
+function blendCoeffs(source: string): { prev: number; next: number } {
+  switch (source) {
+    case 'dashboard':    return { prev: 0.01, next: 0.99 }; // dashboard: 1% prev, 99% new
+    case 'conversation':
+    case 'chat':         return { prev: 0.6, next: 0.4 }; // chat:      60% prev, 40% new
+    case 'history':
+    default:             return { prev: 0.8, next: 0.2 }; // history:   80% prev, 20% new
+  }
+}
+
 /**
  * Persist categories -> attributes with weights.
  * If model didn’t return scores, we fall back to equal weights.
@@ -97,6 +107,7 @@ export async function saveInsightsFromCategories(
 
   const categories: any[] = Array.isArray(insights?.categories) ? insights.categories : []
   const nowISO = new Date().toISOString()
+  const { prev: W_PREV, next: W_NEW } = blendCoeffs(source)
 
   for (const c of categories) {
     const catName = String(c?.name ?? '').trim()
@@ -118,16 +129,14 @@ export async function saveInsightsFromCategories(
       const prev = map.get(key)
       const keepBlocked = prev?.is_blocked ?? false
 
-      // EMA: 80% existing + 20% new (or just new if none exists)
-      const blended = prev
-        ? (0.8 * prev.weight + 0.2 * newWeight)
-        : newWeight
+      // EMA by source
+      const prevWeight = typeof prev?.weight === 'number' ? prev.weight : 0
+      const blended = prev ? (W_PREV * prevWeight + W_NEW * newWeight) : newWeight
 
       const finalWeight = Math.max(0, Math.min(1, Math.round(blended * 1000) / 1000))
 
       const next: InsightRecord = {
-        // id: prev?.id ?? crypto.randomUUID(),
-        id: prev?.id ?? catName + "_" + attr,
+        id: prev?.id ?? `${catName}_${attr}`,
         category: catName,
         user_attribute: attr,
         weight: finalWeight,
@@ -225,11 +234,17 @@ export function generateProfileInputs(rows: ProfileRow[]) {
   }
 }
 
-// 'Use ONLY the provided browsing profile (no external knowledge) and AVOID any PII information, IDs, sensitive and gibberish information.',
-export function buildUserPrompt(profile: unknown, existing: unknown): string {
+export function nounFor(source?: string): 'browsing' | 'conversation' | 'dashboard' {
+  if (source === 'history') return 'browsing';
+  if (source === 'conversation' || source === 'dashboard') return source;
+  return 'browsing';
+}
+
+export function buildUserPrompt(profile: unknown, existing: unknown, source: string = 'history'): string {
+  const source_string = nounFor(source);
   return [
     '### Task',
-    'Summarize browsing interests into high-quality categories and attributes using ONLY the provided profile and previous insights. Do not invent facts or rely on outside knowledge.',
+    `Summarize ${source_string} interests into high-quality categories and attributes using ONLY the provided profile and previous insights. Do not invent facts or rely on outside knowledge.`,
     '',
     '### Category rules',
     '- Name must be a concise, human-readable topic (1–4 words).',
@@ -238,7 +253,7 @@ export function buildUserPrompt(profile: unknown, existing: unknown): string {
     '- Do not miss genuine categories excluding the sensitive categories',
     '',
     '### Attribute rules',
-    '- Each attribute must be a meaningful entity, brand, product type, or preference phrase clearly supported by the browsing evidence.',
+    `- Each attribute must be a meaningful entity, brand, product type, or preference phrase clearly supported by the ${source_string} evidence.`,
     '- Attributes must be between 1 and 2 words, and cannot be generic stopwords (the, and, shop, search, etc.).',
     '- Avoid single letters, random tokens, or vague terms such as "Baby", "Babies", "The", "Sale".',
     '- Normalize duplicates: treat singular/plural/case variants as the same attribute and keep only the best phrasing.',
@@ -420,34 +435,32 @@ export async function getRecentHistory(opts?: {
   return rows
 }
 
-export async function generateInsightsFromHistory(options?: {
-  days?: number
-  maxResults?: number
-  halfLifeDays?: number
-}): Promise<any> {
-  const days = options?.days ?? 60
-  const maxResults = options?.maxResults ?? 500
-  const halfLifeDays = options?.halfLifeDays ?? 14
+export async function readInsights(): Promise<any> {
+  const maxAttrs = 10;
 
-  const baseRows = await getRecentHistory({ days, maxResults })
-  const rows: ProfileRow[] = addWeights(baseRows, halfLifeDays)
-  const profile = generateProfileInputs(rows)
   const existing = await getExistingInsights('local')
-  const prompt = buildUserPrompt(profile, existing)
-  const out = await summarizeCategories(prompt)
+  // console.debug(`existing = ${JSON.stringify(existing)}`)
+  const catMap = new Map<string, Map<string, number>>();
 
-  // Persist under HISTORY_INSIGHTS as a list of JSONs
-  try {
-    const existing = await browser.storage.local.get(LocalStorageKeys.HISTORY_INSIGHTS)
-    const prev = (existing as any)?.[LocalStorageKeys.HISTORY_INSIGHTS]
-    let list: any[] = []
-    if (Array.isArray(prev)) list = prev
-    else if (prev && typeof prev === 'object') list = [prev]
-    list = [...list, out]
-    await browser.storage.local.set({ [LocalStorageKeys.HISTORY_INSIGHTS]: list })
-  } catch (_) {
-    // Non-fatal if persistence fails
+  for (const r of existing || []) {
+    if (!r || r.is_blocked) continue;
+    const cat = (r.category || '').trim();
+    const attr = (r.user_attribute || '').trim();
+    if (!cat || !attr) continue;
+
+    const attrs = catMap.get(cat) ?? new Map<string, number>();
+    attrs.set(attr, Math.max(attrs.get(attr) ?? 0, Number(r.weight) || 0));
+    if (!catMap.has(cat)) catMap.set(cat, attrs);
   }
 
-  return out
+  const categories = Array.from(catMap.entries()).map(([name, attrs]) => {
+    const top = Array.from(attrs.entries())
+      .sort((a, b) => b[1] - a[1])        // sort by weight desc
+      .slice(0, maxAttrs)                 // take top N
+      .map(([attr]) => attr);             // return names only
+    return { name, top_user_attributes: top };
+  });
+
+  return { categories };
+
 }

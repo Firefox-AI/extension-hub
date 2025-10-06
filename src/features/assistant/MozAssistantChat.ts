@@ -5,8 +5,8 @@ import { sendAndAppend } from '../../services/assistantConversation'
 import TinyMark from '../../services/tinyMark'
 import type { ChatMessage } from '../../services/utilsOpenAI'
 import { getQuickPrompts, getQuickPromptsInConversation } from '../../services/assistantQuickPrompts'
-import { generateInsightsFromConversation, formatInsightsMarkdown } from '../../services/assistantInsight'
-import { generateInsightsFromHistory } from '../../services/historyInsight'
+import { formatInsightsMarkdown } from '../../services/assistantInsight'
+import { readInsights } from '../../services/historyInsight'
 import { LocalStorageKeys } from '../../../const'
 
 class MozAssistantChat extends LitElement {
@@ -212,12 +212,6 @@ class MozAssistantChat extends LitElement {
 
           <div class="footer">
             <div class="footer-left">
-              <button class="secondary-button" @click=${() => this.handleGenerateHistoryInsight()} ?disabled=${this.insightLoading}>
-                ${this.insightLoading ? '…' : 'Generate insight from history'}
-              </button>
-              <button class="secondary-button" @click=${() => this.handleGenerateInsight()} ?disabled=${this.insightLoading}>
-                ${this.insightLoading ? '…' : 'Generate insight from conversation'}
-              </button>
               <button class="secondary-button" @click=${() => this.handleLoadSavedInsight()} ?disabled=${this.insightLoading}>
                 Load insights
               </button>
@@ -242,6 +236,7 @@ class MozAssistantChat extends LitElement {
       </div>
     `
   }
+
 
   static styles = [
     FeatureViewStyles,
@@ -404,70 +399,6 @@ class MozAssistantChat extends LitElement {
     }
   }
 
-  private async handleGenerateInsight() {
-    if (this.insightLoading) return
-    this.insightLoading = true
-    try {
-      const result = await generateInsightsFromConversation(this.messages)
-      this.insightText = formatInsightsMarkdown(result)
-    } catch (e) {
-      console.warn('[assistant][insight] generation failed:', e)
-      this.insightText = 'Failed to generate insights.'
-    } finally {
-      this.insightLoading = false
-      this.updateComplete.then(() => this.scrollToBottom())
-    }
-  }
-
-  private async handleLoadSavedInsight() {
-    try {
-      const res = await browser.storage.local.get([
-        LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS,
-        LocalStorageKeys.HISTORY_INSIGHTS,
-      ])
-      const convSaved = (res as any)?.[LocalStorageKeys.ASSISTANT_CONVERSATION_INSIGHTS]
-      const histSaved = (res as any)?.[LocalStorageKeys.HISTORY_INSIGHTS]
-
-      const convList = Array.isArray(convSaved)
-        ? convSaved
-        : convSaved && typeof convSaved === 'object'
-          ? [convSaved]
-          : []
-
-      const histList = Array.isArray(histSaved)
-        ? histSaved
-        : histSaved && typeof histSaved === 'object'
-          ? [histSaved]
-          : []
-
-      // Convert history schema to flat map: { [category]: string[] }
-      const histAsMaps = histList.map((h: any) => {
-        const map: Record<string, string[]> = {}
-        const cats = Array.isArray(h?.categories) ? h.categories : []
-        for (const c of cats) {
-          const name = (c?.name ?? '').toString()
-          if (!name) continue
-          const attrs = Array.isArray(c?.top_user_attributes) ? c.top_user_attributes.map((x: any) => String(x)) : []
-          if (attrs.length) map[name] = Array.from(new Set(attrs))
-        }
-        return map
-      })
-
-      const combined = [...convList, ...histAsMaps]
-
-      if (combined.length === 0) {
-        this.insightText = 'No saved insights found.'
-      } else {
-        this.insightText = formatInsightsMarkdown(combined)
-      }
-    } catch (e) {
-      console.warn('[assistant][insight] load saved failed:', e)
-      this.insightText = 'Failed to load saved insights.'
-    } finally {
-      this.updateComplete.then(() => this.scrollToBottom())
-    }
-  }
-
   private handleCloseInsight() {
     this.insightText = ''
     this.insightLoading = false
@@ -486,11 +417,11 @@ class MozAssistantChat extends LitElement {
     }
   }
 
-  private async handleGenerateHistoryInsight() {
+  private async handleLoadSavedInsight() {
     if (this.insightLoading) return
     this.insightLoading = true
     try {
-      const json = await generateInsightsFromHistory()
+      const json = await readInsights()
       // Convert to display map
       const cats = Array.isArray(json?.categories) ? json.categories : []
       const map: Record<string, string[]> = {}
