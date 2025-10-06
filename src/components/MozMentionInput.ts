@@ -202,8 +202,8 @@ export class MozMentionInput extends LitElement {
     // Case 3: caret is inside a text node at offset > 0 — look behind the caret
     if (isTextNode(anchorNode) && anchorOffset > 0) {
       const textBeforeCaret = anchorNode.textContent?.slice(0, anchorOffset)
-      const spacePattern = /^$/
-      if (!textBeforeCaret?.match(spacePattern)) {
+      const emptyPattern = /^$/
+      if (!textBeforeCaret?.match(emptyPattern)) {
         return
       }
 
@@ -503,9 +503,9 @@ export class MozMentionInput extends LitElement {
   render() {
     return html`
       <div class="dev-note">
-        <b>Developer note:</b> This is a prototype if the @mentions input.
-        Except for some CSS and TS this should be compantable to have a good
-        plug and play start to a real @mentions implimentation on MC.
+        <b>Developer note:</b> This is a prototype of the @mentions input.
+        Except for some CSS and TS this should be compatible to have a good plug
+        and play start to a real @mentions implementation on MC.
       </div>
       <div class="mention-input-container">
         <div
