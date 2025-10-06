@@ -6,6 +6,21 @@ import {
 } from '../../services/openai'
 import type { mlBrowserT } from '../../../types'
 
+const firefox =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Firefox_logo%2C_2019.svg/1024px-Firefox_logo%2C_2019.svg.png?20250401130810'
+const nightly =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Firefox_Nightly_logo%2C_2019.svg/1971px-Firefox_Nightly_logo%2C_2019.svg.png'
+const reddit =
+  'https://cdn3.iconfinder.com/data/icons/2018-social-media-logotypes/1000/2018_social_media_popular_app_logo_reddit-512.png'
+
+const mentionOptions = [
+  { type: 'tab', value: 'https://blog.nightly.mozilla.org/', image: nightly },
+  { type: 'tab', value: 'https://www.firefox.com/en-US/', image: firefox },
+  { type: 'tab', value: 'https://www.reddit.com/r/bicycling/', image: reddit },
+  { type: 'user', value: 'Trevor' },
+  { type: 'user', value: 'Merlin' },
+]
+
 class MozAIModePage extends LitElement {
   query: string = ''
   hasOpenAIKey: boolean = false
@@ -179,7 +194,9 @@ Examples:
   }
 
   async handleSearchGoogle() {
-    const searchUrl = `https://www.google.com/search?client=firefox-b-1-d&q=${encodeURIComponent(this.query)}`
+    const searchUrl = `https://www.google.com/search?client=firefox-b-1-d&q=${encodeURIComponent(
+      this.query,
+    )}`
     window.open(searchUrl, '_blank')
 
     try {
@@ -213,6 +230,12 @@ Examples:
                   src=${aiModeLogo}
                   alt="AI Mode Logo"
                 />
+              </div>
+
+              <div class="mentions-bar">
+                <moz-mention-input
+                  .mentionOptions=${mentionOptions}
+                ></moz-mention-input>
               </div>
 
               <!-- SEARCH BAR -->
