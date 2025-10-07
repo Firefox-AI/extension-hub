@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit'
+import { LitElement, PropertyValues, html } from 'lit'
 import aiModeLogo from '../../../assets/ai-mode-logo.png'
 import {
   getOpenAIChatResponseWithModel,
@@ -13,12 +13,35 @@ const nightly =
 const reddit =
   'https://cdn3.iconfinder.com/data/icons/2018-social-media-logotypes/1000/2018_social_media_popular_app_logo_reddit-512.png'
 
-const mentionOptions = [
-  { type: 'tab', value: 'https://blog.nightly.mozilla.org/', image: nightly },
-  { type: 'tab', value: 'https://www.firefox.com/en-US/', image: firefox },
-  { type: 'tab', value: 'https://www.reddit.com/r/bicycling/', image: reddit },
-  { type: 'user', value: 'Trevor' },
-  { type: 'user', value: 'Merlin' },
+const mentionGroups = [
+  {
+    label: 'Tabs',
+    options: [
+      {
+        type: 'tab',
+        value: 'https://blog.nightly.mozilla.org/',
+        image: nightly,
+      },
+      { type: 'tab', value: 'https://www.firefox.com/en-US/', image: firefox },
+      {
+        type: 'tab',
+        value: 'https://www.reddit.com/r/bicycling/',
+        image: reddit,
+      },
+      { type: 'user', value: 'Trevor' },
+      { type: 'user', value: 'Merlin' },
+    ],
+  },
+  {
+    label: 'Files',
+    options: [
+      { type: 'file', value: 'Report Q2 2024.pdf' },
+      { type: 'file', value: 'Meeting Notes.txt' },
+      { type: 'file', value: 'Project Plan.docx' },
+      { type: 'file', value: 'Budget.xlsx' },
+      { type: 'file', value: 'Presentation.pptx' },
+    ],
+  },
 ]
 
 class MozAIModePage extends LitElement {
@@ -28,6 +51,7 @@ class MozAIModePage extends LitElement {
   showSearchFallback: boolean = false
   isProcessing: boolean = false
   private keyStatusCleanup?: () => void
+  mockOptions = mentionGroups
 
   static get properties() {
     return {
@@ -36,6 +60,7 @@ class MozAIModePage extends LitElement {
       aiResponse: { type: String },
       showSearchFallback: { type: Boolean },
       isProcessing: { type: Boolean },
+      mockOptions: { type: Array },
     }
   }
 
@@ -48,6 +73,15 @@ class MozAIModePage extends LitElement {
     this.initializeOpenAIKeyStatus()
     this.checkForHashQuery()
     this.closeSidebar()
+  }
+
+  protected firstUpdated(_changedProperties: PropertyValues): void {
+    const mozMentionInput = document.querySelector('moz-mention-input')
+    mozMentionInput?.addEventListener('mention-input:filter', (e: any) => {
+      // This is where you would handle the filter event and then we can update the options given to the
+      // mention input component and not have to worry about filerting in the component itself.
+      console.log('Received mention-input:filter event:', e.detail)
+    })
   }
 
   disconnectedCallback() {
@@ -215,6 +249,34 @@ Examples:
     }
   }
 
+  mockOptionsUpdate() {
+    const mentionGroups2 = [
+      {
+        label: 'I work',
+        options: [
+          {
+            type: 'tab',
+            value: 'https://blog.nightly.mozilla.org/',
+            image: nightly,
+          },
+          {
+            type: 'tab',
+            value: 'https://www.firefox.com/en-US/',
+            image: firefox,
+          },
+          {
+            type: 'tab',
+            value: 'https://www.reddit.com/r/bicycling/',
+            image: reddit,
+          },
+          { type: 'user', value: 'Trevor' },
+          { type: 'user', value: 'Merlin' },
+        ],
+      },
+    ]
+    this.mockOptions = mentionGroups2
+  }
+
   render() {
     return html`
       <div class="wrapper">
@@ -233,8 +295,19 @@ Examples:
               </div>
 
               <div class="mentions-bar">
+                <p class="font-small">
+                  This is an example of updateing the options on the fly. We
+                  will look for the dispatched value to update the options in
+                  live time.
+                </p>
+                <button
+                  class="primary-button"
+                  @click="${this.mockOptionsUpdate}"
+                >
+                  Mock Change Options
+                </button>
                 <moz-mention-input
-                  .mentionOptions=${mentionOptions}
+                  .mentionGroups=${this.mockOptions}
                 ></moz-mention-input>
               </div>
 

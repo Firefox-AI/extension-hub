@@ -75,8 +75,7 @@ body {
   max-width: 1400px;
   background: var(--color-bg-frame);
   border-radius: 8px;
-  box-shadow:
-    0 0 20px var(--color-shadow-dark),
+  box-shadow: 0 0 20px var(--color-shadow-dark),
     0 25px 30px var(--color-shadow-darker);
   overflow: hidden;
   position: relative;
@@ -122,8 +121,7 @@ body {
   background: var(--color-bg-white-86);
   border-radius: 14px;
   padding: 16px;
-  box-shadow:
-    0 0.375px 1.5px var(--color-shadow-light),
+  box-shadow: 0 0.375px 1.5px var(--color-shadow-light),
     0 3px 12px var(--color-shadow-medium);
   display: flex;
   flex-direction: column;
@@ -255,8 +253,7 @@ body {
   background: var(--color-bg-white-86);
   border-radius: 14px;
   padding: 20px;
-  box-shadow:
-    0 0.375px 1.5px var(--color-shadow-light),
+  box-shadow: 0 0.375px 1.5px var(--color-shadow-light),
     0 3px 12px var(--color-shadow-medium);
   border: 2px solid var(--color-border-gray);
 }
@@ -344,4 +341,7 @@ body {
 }
 .gap-4 {
   gap: 4px;
+}
+.font-small {
+  font-size: 14px;
 }

@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit'
 
 type MentionOptionT = { type: string; value: string; image?: string }
+type MentionGroupT = { label: string; options: MentionOptionT[] }
 
 function ellipsis(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
@@ -129,21 +130,26 @@ function matchAtTriggerInText(
   return before.match(mentionPattern)
 }
 
+type FlatOptionsT = { group: number; index: number; option: MentionOptionT }
+
 export class MozMentionInput extends LitElement {
   /** public api */
   placeholder = 'Type some text with @mentions...'
   mentionOptions: MentionOptionT[] = []
+  mentionGroups: MentionGroupT[] = []
 
   /** internal state */
   private _showMentions = false
   private _onKeyDown!: (e: KeyboardEvent) => void
   private _selectedIndex = -1
-  private _filteredMentionOptions: MentionOptionT[] = []
+  private _filteredMentionGroups: MentionGroupT[] = []
+  private _flatOptions: FlatOptionsT[] = []
 
   static properties = {
     placeholder: { type: String },
     mentionOptions: { type: Array },
-    _filteredMentionOptions: { type: Array, state: true },
+    mentionGroups: { type: Array },
+    _filteredMentionGroups: { type: Array, state: true },
     _selectedIndex: { type: Number, state: true },
     _showMentions: { type: Boolean, state: true },
   }
@@ -152,12 +158,49 @@ export class MozMentionInput extends LitElement {
     return this.renderRoot.querySelector<HTMLDivElement>('.mention-input')
   }
 
-  constructor() {
-    super()
-    this._filteredMentionOptions = [...this.mentionOptions]
+  private get container(): HTMLDivElement | null {
+    return this.renderRoot.querySelector<HTMLDivElement>(
+      '.mention-input-container',
+    )
   }
 
-  /** lit: called after first render — safe to touch the shadow DOM */
+  constructor() {
+    super()
+    this._filteredMentionGroups = [...this.mentionGroups]
+  }
+
+  private _rebuildFlatOptions() {
+    this._flatOptions = []
+    this._filteredMentionGroups.forEach((group, groupIndex) => {
+      group.options.forEach((option, optionIndex) => {
+        this._flatOptions.push({
+          group: groupIndex,
+          index: optionIndex,
+          option,
+        })
+      })
+    })
+    if (!this._flatOptions.length) {
+      this._selectedIndex = -1
+    } else if (
+      this._selectedIndex < 0 ||
+      this._selectedIndex >= this._flatOptions.length
+    ) {
+      this._selectedIndex = 0
+    }
+  }
+
+  protected willUpdate(changed: Map<string, unknown>) {
+    if (changed.has('mentionGroups')) {
+      const groups = (this.mentionGroups ?? []) as MentionGroupT[]
+      this._filteredMentionGroups = groups.map((g) => ({
+        label: g.label,
+        options: [...g.options],
+      }))
+      this._rebuildFlatOptions()
+    }
+  }
+
   firstUpdated() {
     const element = this.editableSection
     if (!element) return
@@ -165,6 +208,9 @@ export class MozMentionInput extends LitElement {
     // keep a stable listener ref for add/remove
     this._onKeyDown = (e: KeyboardEvent) => this.handleKeyDown(e)
     element.addEventListener('keydown', this._onKeyDown)
+
+    const container = this.container
+    container?.addEventListener('focusout', this._onFocusOut as any)
   }
 
   disconnectedCallback(): void {
@@ -172,7 +218,24 @@ export class MozMentionInput extends LitElement {
     if (el && this._onKeyDown) {
       el.removeEventListener('keydown', this._onKeyDown)
     }
+    const container = this.container
+    container?.removeEventListener('focusout', this._onFocusOut as any)
     super.disconnectedCallback()
+  }
+
+  private _onFocusOut = (e: FocusEvent) => {
+    // Where is focus going?
+    const next = e.relatedTarget as Node | null
+
+    // Still inside this component (shadow or light)?
+    const inside =
+      !!next && (this.shadowRoot?.contains(next) || this.contains(next))
+
+    if (!inside) {
+      this._showMentions = false
+      this._selectedIndex = -1
+      this.requestUpdate()
+    }
   }
 
   /** Keyboard Handlers */
@@ -233,29 +296,25 @@ export class MozMentionInput extends LitElement {
     removeDomNode(nextSibling)
   }
 
-  handleArrowDown(event: KeyboardEvent) {
-    event.preventDefault()
-
-    if (this._selectedIndex === this._filteredMentionOptions.length - 1) {
-      this._selectedIndex = 0
-      return
-    }
-
-    this._selectedIndex = Math.min(
-      this._selectedIndex + 1,
-      this._filteredMentionOptions.length - 1,
-    )
+  handleArrowDown(e: KeyboardEvent) {
+    e.preventDefault()
+    if (!this._flatOptions.length) return
+    this._selectedIndex = (this._selectedIndex + 1) % this._flatOptions.length
   }
 
-  handleArrowUp(event: KeyboardEvent) {
-    event.preventDefault()
+  handleArrowUp(e: KeyboardEvent) {
+    e.preventDefault()
+    if (!this._flatOptions.length) return
+    this._selectedIndex =
+      (this._selectedIndex - 1 + this._flatOptions.length) %
+      this._flatOptions.length
+  }
 
-    if (this._selectedIndex === 0) {
-      this._selectedIndex = this._filteredMentionOptions.length - 1
-      return
-    }
-
-    this._selectedIndex = Math.max(this._selectedIndex - 1, 0)
+  handleEnter(e: KeyboardEvent) {
+    e.preventDefault()
+    if (!this._showMentions) return this.handleSubmit()
+    const row = this._flatOptions[this._selectedIndex]
+    if (row) this.selectMention(row.option)
   }
 
   handleArrowLeft(
@@ -263,6 +322,7 @@ export class MozMentionInput extends LitElement {
     anchorNode: Node,
     anchorOffset: number,
   ) {
+    this._showMentions = false
     if (!isTextNode(anchorNode)) return
 
     // Caret is at the start of a text node
@@ -296,6 +356,7 @@ export class MozMentionInput extends LitElement {
     anchorNode: Node,
     anchorOffset: number,
   ) {
+    this._showMentions = false
     if (!isTextNode(anchorNode)) return
 
     const textContent = anchorNode.textContent ?? ''
@@ -320,26 +381,13 @@ export class MozMentionInput extends LitElement {
     }
   }
 
-  handleEnter(event: KeyboardEvent) {
-    event.preventDefault()
-
-    if (!this._showMentions) {
-      this.handleSubmit()
-      return
-    }
-
-    if (this._selectedIndex >= 0) {
-      this.selectMention(this._filteredMentionOptions[this._selectedIndex])
-    }
-  }
-
   handleEscape(event: KeyboardEvent) {
     event.preventDefault()
     this._showMentions = false
     this._selectedIndex = -1
   }
 
-  private handleKeyDown = (event: KeyboardEvent) => {
+  private handleKeyDown(event: KeyboardEvent) {
     const editableSection = this.editableSection
     if (!editableSection) return
 
@@ -387,17 +435,15 @@ export class MozMentionInput extends LitElement {
     const { filterText, show } = this.getMentionFilterText()
 
     if (show) {
-      // Filter options based on what user typed after @
-      this._filteredMentionOptions = this.mentionOptions.filter((option) =>
-        option.value.toLowerCase().startsWith(filterText.toLowerCase()),
+      this.dispatchEvent(
+        new CustomEvent('mention-input:filter', {
+          detail: { value: filterText },
+        }),
       )
-      this._selectedIndex = this._filteredMentionOptions.length > 0 ? 0 : -1
-    } else {
-      this._filteredMentionOptions = [...this.mentionOptions]
-      this._selectedIndex = -1
     }
 
     this._showMentions = show
+    this._rebuildFlatOptions() // keep in lockstep
   }
 
   private handleMentionClick = (e: Event) => {
@@ -462,6 +508,7 @@ export class MozMentionInput extends LitElement {
 
     editableSection.focus()
     this._showMentions = false
+    this._selectedIndex = -1
   }
 
   private buildSubmissionString(): string {
@@ -491,7 +538,6 @@ export class MozMentionInput extends LitElement {
 
   private handleSubmit = () => {
     const submission = this.buildSubmissionString()
-    console.log('Submitting:', submission)
     // bubble a submit event with the built string
     this.dispatchEvent(
       new CustomEvent('mention-input:submit', {
@@ -517,40 +563,70 @@ export class MozMentionInput extends LitElement {
 
         ${this._showMentions
           ? html`
-              <div class="mentions-dropdown" role="listbox">
-                ${this._filteredMentionOptions.map(
-                  (option, index) => html`
-                    <div
-                      class="mention-option ${index === this._selectedIndex
-                        ? 'selected'
-                        : ''}"
-                      role="option"
-                      @mousedown=${(e: MouseEvent) => {
-                        // keep focus in contenteditable while selecting
-                        e.preventDefault()
-                        this.selectMention(option)
-                      }}
-                    >
-                      ${option.type === 'tab' && option.image
-                        ? html`<img
-                            class="favicon"
-                            src=${option.image}
-                            alt=${option.value}
-                            width="14"
-                            height="14"
-                          />`
-                        : ''}
-                      ${option.type === 'user' ? '@' : ''}
-                      ${ellipsis(option.value, 70)}
-                    </div>
-                  `,
-                )}
+              <div
+                class="mentions-dropdown"
+                role="listbox"
+                aria-label="Mentions"
+              >
+                ${(() => {
+                  let flat = 0 // single source of truth for row index
+                  return this._filteredMentionGroups.map(
+                    (group) => html`
+                      <div class="group" role="group" aria-label=${group.label}>
+                        <div class="group-label">${group.label}</div>
+                        ${group.options.map((opt) => {
+                          const rowIndex = flat++
+                          const selected = rowIndex === this._selectedIndex
+                          return html`
+                            <div
+                              class="mention-option ${selected
+                                ? 'selected'
+                                : ''}"
+                              role="option"
+                              aria-selected=${selected}
+                              data-flat-index=${rowIndex}
+                              @mousemove=${() => {
+                                this._selectedIndex = rowIndex
+                              }}
+                              @mousedown=${(e: MouseEvent) => {
+                                e.preventDefault() // keep CE focus & selection
+                                const idx = Number(
+                                  (e.currentTarget as HTMLElement).dataset
+                                    .flatIndex,
+                                )
+                                const row = this._flatOptions[idx]
+                                if (row) this.selectMention(row.option)
+                              }}
+                            >
+                              ${opt.type === 'tab' && opt.image
+                                ? html`
+                                    <img
+                                      class="favicon"
+                                      src=${opt.image}
+                                      alt=${opt.value}
+                                      width="14"
+                                      height="14"
+                                    />
+                                  `
+                                : ''}
+                              ${opt.type === 'user' ? '@' : ''}${ellipsis(
+                                opt.value,
+                                70,
+                              )}
+                            </div>
+                          `
+                        })}
+                      </div>
+                      <div role="separator" class="group-sep"></div>
+                    `,
+                  )
+                })()}
               </div>
             `
           : null}
         <hr class="mention-hr" />
         <div class="mention-actions">
-          <button class="primary-button" @click="${this.handleSubmit}">
+          <button class="primary-button" @click=${this.handleSubmit}>
             Submit
           </button>
         </div>
@@ -664,6 +740,20 @@ export class MozMentionInput extends LitElement {
     .mention-option.selected {
       background: #007acc;
       color: white;
+    }
+
+    .group-label {
+      padding: 6px 12px;
+      font-weight: 600;
+      color: #666;
+    }
+    .group-sep {
+      height: 1px;
+      background: #eee;
+      margin: 4px 0;
+    }
+    .group:last-of-type + .group-sep {
+      display: none;
     }
   `
 }
