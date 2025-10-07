@@ -744,8 +744,9 @@ export class MozMentionInput extends LitElement {
 
     .group-label {
       padding: 6px 12px;
-      font-weight: 600;
+      font-weight: 800;
       color: #666;
+      font-size: 12px;
     }
     .group-sep {
       height: 1px;

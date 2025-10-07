@@ -28,18 +28,15 @@ const mentionGroups = [
         value: 'https://www.reddit.com/r/bicycling/',
         image: reddit,
       },
-      { type: 'user', value: 'Trevor' },
-      { type: 'user', value: 'Merlin' },
     ],
   },
   {
-    label: 'Files',
+    label: 'Groups',
     options: [
-      { type: 'file', value: 'Report Q2 2024.pdf' },
-      { type: 'file', value: 'Meeting Notes.txt' },
-      { type: 'file', value: 'Project Plan.docx' },
-      { type: 'file', value: 'Budget.xlsx' },
-      { type: 'file', value: 'Presentation.pptx' },
+      { type: 'file', value: 'Group 1' },
+      { type: 'file', value: 'Group 2' },
+      { type: 'file', value: 'Group 3' },
+      { type: 'file', value: 'Group 4' },
     ],
   },
 ]
