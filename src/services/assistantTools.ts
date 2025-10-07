@@ -195,6 +195,22 @@ export async function get_weather_city(): Promise<string | null> {
   }
 }
 
+export async function get_weather_location(): Promise<{
+  city: string | null
+  region: string | null
+  country: string | null
+  countryCode: string | null
+} | null> {
+  try {
+    // @ts-ignore - experiment API typings are not available
+    const loc = await (browser as any).extensionHub?.getWeatherLocation?.()
+    if (loc && typeof loc === 'object') return loc
+    return null
+  } catch (_) {
+    return null
+  }
+}
+
 async function getDescriptionForTab(tabId?: number) {
   if (!tabId) return ''
   try {

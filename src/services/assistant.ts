@@ -1,5 +1,5 @@
 import { LocalStorageKeys } from '../../const'
-import { initOpenAIClient, chatComplete } from './utilsOpenAI'
+import { initOpenAIClient, chatComplete, chatCompleteStream } from './utilsOpenAI'
 import type { ChatMessage } from './utilsOpenAI'
 import { assistantTools, get_page_content, get_insights, search_history, get_tabs, get_current_tab } from './assistantTools'
 
@@ -326,6 +326,173 @@ export class AssistantService {
       console.log('[assistant][tokens] prompt=%d completion=%d total=%d', totals.prompt, totals.completion, totals.total)
     } catch (_) {}
     return 'No content returned.'
+  }
+
+  async sendStream(
+    messages: ChatMessage[],
+    handlers: {
+      onDelta?: (text: string) => void
+      onEnd?: (finalText: string) => void
+    } = {},
+  ): Promise<string> {
+    await this.initialize()
+
+    const TOOL_DISPATCH: any = {
+      get_page_content,
+      search_history,
+      get_insights,
+      get_tabs,
+      get_current_tab,
+    }
+
+    let convo: ChatMessage[] = [...messages]
+    let iterations = 0
+    while (true) {
+      let streamedText = ''
+      let streamedToolCalls: Record<number, { id?: string; function: { name: string; arguments: string } }> = {}
+      let lastFinish: string | undefined
+
+      try {
+        const stream = await chatCompleteStream({
+          model: this.modelId,
+          // @ts-ignore
+          messages: convo as any,
+          tools: assistantTools as any,
+        })
+        for await (const chunk of stream) {
+          const c = chunk as any
+          const choice = c?.choices?.[0] || {}
+          const delta = choice?.delta || {}
+          lastFinish = choice?.finish_reason || lastFinish
+
+          // Natural language delta
+          const contentDelta = delta?.content
+          if (typeof contentDelta === 'string' && contentDelta) {
+            streamedText += contentDelta
+            try { handlers.onDelta?.(contentDelta) } catch (_) {}
+          }
+
+          // Tool call deltas
+          const tcs = delta?.tool_calls
+          if (Array.isArray(tcs)) {
+            for (const tc of tcs) {
+              const idx = typeof tc?.index === 'number' ? tc.index : 0
+              if (!streamedToolCalls[idx]) {
+                streamedToolCalls[idx] = { id: tc?.id, function: { name: '', arguments: '' } }
+              }
+              if (tc?.id && !streamedToolCalls[idx].id) streamedToolCalls[idx].id = tc.id
+              const fn = tc?.function || {}
+              if (typeof fn?.name === 'string') streamedToolCalls[idx].function.name += fn.name
+              if (typeof fn?.arguments === 'string') streamedToolCalls[idx].function.arguments += fn.arguments
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[assistant][stream] request failed:', err)
+        const fail = 'The AI request failed or timed out. Please try again.'
+        try { handlers.onEnd?.(fail) } catch (_) {}
+        return fail
+      }
+
+      const toolCallsArr = Object.values(streamedToolCalls)
+
+      // If we have tool calls requested, dispatch first one and continue loop
+      if (toolCallsArr.length > 0 || lastFinish === 'tool_calls') {
+        const assistantCallMessage: ChatMessage = {
+          role: 'assistant',
+          content: '',
+          // @ts-ignore
+          tool_calls: toolCallsArr,
+        }
+        convo = [...convo, assistantCallMessage]
+
+        const call = toolCallsArr[0]
+        const name = call?.function?.name
+        let args: any = {}
+        try { args = JSON.parse(call?.function?.arguments || '{}') } catch (_) {}
+        console.log('[assistant][tool-call][stream]', name, args)
+
+        let output: any
+        if (name === 'search_engine') {
+          const q = typeof args?.query === 'string' ? args.query : ''
+          const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`
+
+          let autoSummarize = false
+          try {
+            const { assistant_auto_search_summarize } = await browser.storage.local.get(
+              LocalStorageKeys.ASSISTANT_AUTO_SEARCH_SUMMARIZE,
+            )
+            autoSummarize = !!assistant_auto_search_summarize
+          } catch (_) {}
+
+          if (!autoSummarize) {
+            const btn = `SEARCH_BUTTON:${url}|Search the web for \"${q}\"`
+            try { handlers.onDelta?.(btn) } catch (_) {}
+            try { handlers.onEnd?.(btn) } catch (_) {}
+            return btn
+          }
+
+          const waitForComplete = (tabId: number, timeoutMs = 10000) =>
+            new Promise<void>((resolve) => {
+              let done = false
+              const timer = setTimeout(() => {
+                if (done) return
+                done = true
+                try { browser.tabs.onUpdated.removeListener(listener) } catch (_) {}
+                resolve()
+              }, timeoutMs)
+              const listener = (updatedTabId: number, changeInfo: any) => {
+                if (updatedTabId === tabId && changeInfo.status === 'complete') {
+                  if (done) return
+                  done = true
+                  clearTimeout(timer)
+                  try { browser.tabs.onUpdated.removeListener(listener) } catch (_) {}
+                  resolve()
+                }
+              }
+              browser.tabs.onUpdated.addListener(listener)
+            })
+
+          try {
+            const tab = await browser.tabs.create({ url, active: false })
+            if (tab.id) await waitForComplete(tab.id, 5000)
+          } catch (e) {
+            console.warn('[assistant][search_engine][stream] failed to open SERP:', e)
+          }
+
+          try {
+            const page = await get_page_content({ url })
+            output = { url, page }
+          } catch (e) {
+            output = { url, error: 'Failed to retrieve SERP content.' }
+          }
+        } else {
+          const fn = TOOL_DISPATCH[name]
+          output = await (fn ? fn(args) : Promise.resolve({ error: `Unknown tool: ${name}` }))
+        }
+
+        const toolMessage: ChatMessage = {
+          role: 'tool',
+          content: typeof output === 'string' ? output : JSON.stringify(output),
+          // @ts-ignore
+          tool_call_id: call?.id || 'call_0',
+        }
+        convo = [...convo, toolMessage]
+
+        iterations += 1
+        if (iterations > 20) {
+          console.warn('[assistant][stream] breaking after too many tool iterations')
+          const msg = 'No content returned.'
+          try { handlers.onEnd?.(msg) } catch (_) {}
+          return msg
+        }
+        continue
+      }
+
+      // Natural language response only; we already streamed deltas
+      try { handlers.onEnd?.(streamedText) } catch (_) {}
+      return streamedText || 'No content returned.'
+    }
   }
 }
 

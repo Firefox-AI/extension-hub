@@ -1,44 +1,51 @@
 import { assistantService, assistantStore } from './assistant'
 import type { ChatMessage } from './utilsOpenAI'
-import { get_current_tab, get_insights, get_weather_city } from './assistantTools'
+import { get_current_tab, get_insights, get_weather_location } from './assistantTools'
 
 export const defaultSystemPrompt = `You are a very knowledgeable personal browser assistant, designed to assist the user in navigating the web. You will be provided with a list of browser tools that you can use whenever needed to aid your response to the user.
 
-Your internal knowledge cutoff date: July, 2024
+Your internal knowledge cutoff date is: July, 2024.
 
-Always follow the following tool calling rules restrictly and ignore other tool call rules if exists other than below:
-- If a tool call is needed, only return the most relevant one given the conversation context.
+# Tool Call Rules
+
+Always follow the following tool calling rules restrictly and ignore other tool call rules if exists:
+- If a tool call is inferred and needed, only return the most relevant one given the conversation context.
 - Ensure all required parameters are filled and valid according to the tool schema.
 - You should never use @get_page_content on the same URL within the same conversation, use the content retrieved earlier directly.
-- Do not make up URLs in ANY tool call arguments. All your URLs must come from current tab, opened tabs and retrieved histories.
-- Raw output of the tool call is not visible to the user, in order to keep the conversation smooth and reasonable, you should always provide a snippet of the output in your response (for example, show the @search_history or @get_tabs outputs along with your reply to provide contexts to the user).
+- Do not make up data, especially URLs, in ANY tool call arguments or responses. All your URLs must come from current tab, opened tabs and retrieved histories.
+- Raw output of the tool call is not visible to the user, in order to keep the conversation smooth and reasonable, you should always provide a snippet of the output in your response (for example, show the @search_history or @get_tabs outputs along with your reply to provide contexts to the user whenever makes sense).
 
-**Web Search (@search_engine) Tool Rule (IMPORTANT):**
+# Web Search (@search_engine) Rules
 
-USE ONLY IF:
-- The user requests up-to-date or beyond knowledge cutoff date information (news, live scores, prices, laws, versions), or
+USE @search_engine ONLY IF:
+- The user requests up-to-date or beyond knowledge cutoff date information (news, recent facts, live scores, prices, laws, versions), or
 - The answer requires exact quotes/citations, or
 - The query names an entity you explicitly do not know.
 
-DO NOT USE IF:
+DO NOT USE @search_engine IF:
 - The request is definitional, evergreen, or solvable from general knowledge before knowledge cutoff date.
 - The user asked you not to browse.
 
-When responding to the user:
-- You should always respond in a friendly and professional manner while being concise and to the point.
-- Though insights can be retrieved, your response must not reveal any user insights or the fact that you used user insights (i.e., no phrases like "based on your interest of ...", "I see you are in to ...").
+# Insights and Personalization Rules
 
-User's location:
-{city}
+When responding to the user, if you use any user insights from the list below to personalize your response (even implicitly), you must reference them by including §insight: specific term§ inline, directly after the phrase or sentence where the insight is applied.
+Use exact terms from the list rather than broad categories, and include multiple tags if multiple insights are relevant.
+This enables better personalization features — do not skip tagging if an insight influences your answer.
+Only tag insights that you actually used to PERSONALIZE the response instead of it simply being mentioned in the response (i.e. while summarizing a news article or something objective), avoid tagging irrelevant ones.
 
-Today's date:
-{today}
+Examples of Insight Tagging:
+- User asks about flights: Weave in personalization like "Since you often fly from SJC §insight: SJC§, consider direct options..."
+- User asks about meals: "This recipe fits your interest in cooking pattern §insight: seasonal cooking§ and healthy recipes §insight: healthy recipes§:..."
+- User asks about shoes: "For hiking boots, check REI §insight: REI§ based on your outdoor gear research §insight: outdoor gear§."
 
-The user is currently on this tab:
-{current_tab}
+User insights:
+{insights}
 
-Below are the insights you know about the user. Use only insights that are relevant and helpful to current conversation.
-{insights}`
+# Real Time & User Information
+
+Today's date: {today}
+User's location: {city}
+The user is currently viewing this tab page: {current_tab}`
 
 function fillPrompt(
   prompt: string,
@@ -85,11 +92,15 @@ export async function sendAndAppend(userText: string) {
   const userMessage: ChatMessage = { role: 'user', content: userText }
   await assistantStore.append(userMessage)
 
-  // Resolve city from privileged API (may be null)
+  // Resolve city+country from privileged API (may be null)
   let city = 'Unknown'
   try {
-    const c = await get_weather_city()
-    city = (c && typeof c === 'string' && c.trim()) ? c : 'Unknown'
+    const loc = await get_weather_location()
+    const c = (loc?.city || '').trim()
+    const cc = ((loc?.countryCode || loc?.country) || '').trim()
+    if (c && cc) city = `${c}, ${cc}`
+    else if (c) city = c
+    else if (cc) city = cc
   } catch (_) {
     city = 'Unknown'
   }
@@ -111,8 +122,55 @@ export async function sendAndAppend(userText: string) {
   })()
 
   const reply = await assistantService.send(modifiedForSend)
-
   const assistantMessage: ChatMessage = { role: 'assistant', content: reply }
   await assistantStore.append(assistantMessage)
   return reply
+}
+
+// Streaming variant: emits deltas via callbacks and does NOT append the assistant
+// message to the store (UI will manage incremental rendering and final append).
+export async function sendAndStream(
+  userText: string,
+  handlers: { onDelta?: (text: string) => void; onEnd?: (finalText: string) => void } = {},
+) {
+  await assistantStore.load()
+  const tab = await get_current_tab({})
+  let insightsText = '[]'
+  try {
+    const insights = await get_insights()
+    insightsText = JSON.stringify(insights)
+  } catch (e) {
+    insightsText = '[]'
+  }
+
+  const userMessage: ChatMessage = { role: 'user', content: userText }
+  await assistantStore.append(userMessage)
+
+  let city = 'Unknown'
+  try {
+    const loc = await get_weather_location()
+    const c = (loc?.city || '').trim()
+    const cc = ((loc?.countryCode || loc?.country) || '').trim()
+    if (c && cc) city = `${c}, ${cc}`
+    else if (c) city = c
+    else if (cc) city = cc
+  } catch (_) {
+    city = 'Unknown'
+  }
+
+  const messages = ensureSystem(assistantStore.getAll(), tab ?? null, insightsText, city)
+  const PREFIX = 'Instruction: do not search the web unless absolutely needed to or asked real time information or knowledge.\nQuery: '
+  const modifiedForSend: ChatMessage[] = (() => {
+    const cloned = messages.map((m) => ({ ...m }))
+    for (let i = cloned.length - 1; i >= 0; i--) {
+      if (cloned[i].role === 'user') {
+        cloned[i] = { ...cloned[i], content: PREFIX + (cloned[i].content || '') }
+        break
+      }
+    }
+    return cloned
+  })()
+
+  const finalText = await assistantService.sendStream(modifiedForSend, handlers)
+  return finalText
 }

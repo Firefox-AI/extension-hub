@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit'
 import { FeatureViewStyles } from '../FeatureViewStyles'
 import { assistantStore } from '../../services/assistant'
-import { sendAndAppend } from '../../services/assistantConversation'
+import { sendAndStream } from '../../services/assistantConversation'
 import TinyMark from '../../services/tinyMark'
 import type { ChatMessage } from '../../services/utilsOpenAI'
 import { getQuickPrompts, getQuickPromptsInConversation } from '../../services/assistantQuickPrompts'
@@ -22,6 +22,7 @@ class MozAssistantChat extends LitElement {
   autoSearchSummarize: boolean = false
   private currentTabId?: number
   private currentUrl: string = ''
+  private messageInsights: Record<number, Array<{ tag: string; value: string }>> = {}
 
   static properties = {
     messages: { type: Array },
@@ -51,6 +52,7 @@ class MozAssistantChat extends LitElement {
   async init() {
     await assistantStore.load()
     this.messages = assistantStore.getAll()
+    this.messageInsights = {}
     try {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
       this.currentTabId = tab?.id
@@ -79,30 +81,68 @@ class MozAssistantChat extends LitElement {
     // Hide suggestions once the user starts typing/sending
     if (this.messages.length > 0) this.quickPrompts = []
     try {
-      await sendAndAppend(text)
-    } catch (err) {
-      console.error('[assistant] send failed:', err)
-      // surface an error message in the thread for visibility
-      this.messages = [
-        ...assistantStore.getAll(),
-        { role: 'assistant', content: 'Sorry, the request was aborted. Please try again.' },
-      ]
-    } finally {
-      this.messages = assistantStore.getAll()
-      if (this.messages.length > 0) this.quickPrompts = []
-      this.loading = false
-      // After assistant response, fetch in-conversation quick prompts
-      try {
-        const last = [...this.messages].reverse().find((m) => m.role === 'assistant')
-        const isSearchButton = last && typeof last.content === 'string' && last.content.startsWith('SEARCH_BUTTON:')
-        if (!isSearchButton) {
-          const next = await getQuickPromptsInConversation(this.messages, 2)
-          this.quickPrompts = next
+      // Insert placeholder assistant message for streaming
+      const assistantIndex = this.messages.length
+      this.messages = [...this.messages, { role: 'assistant', content: '' }]
+
+      let insideTag = false
+      let tagBuffer = ''
+      let visible = ''
+      const insights: Array<{ tag: string; value: string }> = []
+
+      const onDelta = (delta: string) => {
+        for (let i = 0; i < delta.length; i++) {
+          const ch = delta[i]
+          if (ch === '§') {
+            if (!insideTag) {
+              insideTag = true
+              tagBuffer = ''
+            } else {
+              const raw = tagBuffer.trim()
+              const m = /^\s*insight\s*:\s*(.+)$/i.exec(raw)
+              if (m && m[1]) insights.push({ tag: 'insight', value: m[1].trim() })
+              insideTag = false
+              tagBuffer = ''
+            }
+            continue
+          }
+          if (insideTag) tagBuffer += ch
+          else visible += ch
         }
-      } catch (e) {
-        console.warn('[assistant][quick-prompts] in-convo generation failed:', e)
+        const updated = [...this.messages]
+        updated[assistantIndex] = { ...updated[assistantIndex], content: visible }
+        this.messages = updated
+        this.requestUpdate()
+        this.updateComplete.then(() => this.scrollToBottom())
       }
-      this.updateComplete.then(() => this.scrollToBottom())
+
+      const onEnd = async (_final: string) => {
+        this.messageInsights[assistantIndex] = insights
+        try {
+          await assistantStore.append({ role: 'assistant', content: visible })
+        } catch (e) {
+          console.warn('[assistant][stream] persist failed:', e)
+        }
+        try {
+          const last = [...this.messages].reverse().find((m) => m.role === 'assistant')
+          const isSearchButton = last && typeof last.content === 'string' && last.content.startsWith('SEARCH_BUTTON:')
+          if (!isSearchButton) {
+            const next = await getQuickPromptsInConversation(this.messages, 2)
+            this.quickPrompts = next
+          }
+        } catch (e) {
+          console.warn('[assistant][quick-prompts] in-convo generation failed:', e)
+        }
+        this.loading = false
+        this.requestUpdate()
+        this.updateComplete.then(() => this.scrollToBottom())
+      }
+
+      await sendAndStream(text, { onDelta, onEnd })
+    } catch (err) {
+      console.error('[assistant] send stream failed:', err)
+      this.messages = [...this.messages, { role: 'assistant', content: 'Sorry, the request was aborted. Please try again.' }]
+      this.loading = false
     }
   }
 
@@ -123,6 +163,7 @@ class MozAssistantChat extends LitElement {
     this.inputValue = ''
     assistantStore.clear()
     this.refreshQuickPrompts()
+    this.messageInsights = {}
   }
 
   render() {
@@ -158,10 +199,15 @@ class MozAssistantChat extends LitElement {
           </div>
           <div class="chat-window">
             ${this.messages.map(
-              (m) => html`
+              (m, idx) => html`
                 <div class="bubble-wrapper ${m.role}">
                   <div class="bubble ${m.role}">
                     ${renderAssistantContent(m.content)}
+                    ${m.role === 'assistant' && this.messageInsights[idx] && this.messageInsights[idx].length
+                      ? html`<div class="inline-insights">
+                          ${this.messageInsights[idx].map((ins) => html`<span class="chip">${ins.tag}: ${ins.value}</span>`)}
+                        </div>`
+                      : ''}
                   </div>
                 </div>`,
             )}
@@ -318,6 +364,8 @@ class MozAssistantChat extends LitElement {
       .insight-body {
         padding: 10px 12px;
       }
+      .inline-insights { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+      .chip { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; border-radius: 9999px; padding: 2px 8px; font-size: 12px; }
       .icon-button {
         background: transparent;
         border: none;
@@ -342,6 +390,7 @@ class MozAssistantChat extends LitElement {
         this.currentUrl = tab?.url || ''
         await assistantStore.load()
         this.messages = assistantStore.getAll()
+        this.messageInsights = {}
       } catch (_) {}
       this.refreshQuickPrompts()
       this.updateComplete.then(() => this.scrollToBottom())
@@ -387,10 +436,12 @@ class MozAssistantChat extends LitElement {
           this.currentUrl = newUrl
           await assistantStore.load()
           this.messages = assistantStore.getAll()
+          this.messageInsights = {}
         } else if (changeInfo?.status === 'complete') {
           // Just refresh to reflect any page-derived context changes
           await assistantStore.load()
           this.messages = assistantStore.getAll()
+          this.messageInsights = {}
         }
       } catch (_) {}
       this.refreshQuickPrompts()

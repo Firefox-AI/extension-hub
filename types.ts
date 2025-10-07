@@ -37,6 +37,12 @@ export type mlBrowserT = {
     updateUIForAIMode: (enabled: boolean) => Promise<boolean>
     getLastFocusedUrl: () => Promise<string | null>
     getWeatherCity: () => Promise<string | null>
+    getWeatherLocation: () => Promise<{
+      city: string | null
+      region: string | null
+      country: string | null
+      countryCode: string | null
+    }>
     closeSidebar: () => Promise<boolean>
   }
   trial?: {

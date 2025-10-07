@@ -68,3 +68,31 @@ export async function chatComplete(params: {
   ])
   return result
 }
+
+export async function chatCompleteStream(params: {
+  model: string
+  messages: ChatMessage[]
+  tools?: ChatToolsLite
+  response_format?: any
+  timeoutMs?: number
+}): Promise<any> {
+  const { timeoutMs = 90000 } = params
+  const client = getOpenAIClient()
+  const request = client.chat.completions.create({
+    model: params.model,
+    // @ts-ignore
+    messages: params.messages as any,
+    tools: params.tools as any,
+    // @ts-ignore expose schema if provided
+    response_format: params.response_format,
+    stream: true as any,
+  } as any)
+
+  const stream: any = await Promise.race([
+    request,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('request-timeout')), timeoutMs),
+    ),
+  ])
+  return stream
+}

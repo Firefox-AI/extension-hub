@@ -153,6 +153,12 @@
       },
       {
         "async": true,
+        "name": "getWeatherLocation",
+        "parameters": [],
+        "type": "function"
+      },
+      {
+        "async": true,
         "name": "closeSidebar",
         "parameters": [],
         "type": "function"
