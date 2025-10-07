@@ -23,6 +23,12 @@ export type InsightRecord = {
   
 const STORAGE_KEY = 'moz_insight_records_v1'
 
+const SOURCE_HISTORY_COEFF = {
+  'dashboard': 0.01,
+  'conversation': 0.4,
+  'history': 0.8
+}
+
 function norm(s: unknown): string {
   return String(s ?? '').trim().toLowerCase()
 }
@@ -80,11 +86,10 @@ export async function getExistingInsights(
 
 function blendCoeffs(source: string): { prev: number; next: number } {
   switch (source) {
-    case 'dashboard':    return { prev: 0.01, next: 0.99 }; // dashboard: 1% prev, 99% new
-    case 'conversation':
-    case 'chat':         return { prev: 0.6, next: 0.4 }; // chat:      60% prev, 40% new
+    case 'dashboard':    return { prev: SOURCE_HISTORY_COEFF.dashboard, next: 1.0 - SOURCE_HISTORY_COEFF.dashboard }; //  dashboard:  1% prev, 99% new
+    case 'conversation': return { prev: SOURCE_HISTORY_COEFF.conversation, next: 1.0 - SOURCE_HISTORY_COEFF.conversation }; // chat: 60% prev, 40% new
     case 'history':
-    default:             return { prev: 0.8, next: 0.2 }; // history:   80% prev, 20% new
+    default:             return { prev: SOURCE_HISTORY_COEFF.history, next: 1.0 - SOURCE_HISTORY_COEFF.history }; //        history: 80% prev, 20% new
   }
 }
 
@@ -439,7 +444,6 @@ export async function readInsights(): Promise<any> {
   const maxAttrs = 10;
 
   const existing = await getExistingInsights('local')
-  // console.debug(`existing = ${JSON.stringify(existing)}`)
   const catMap = new Map<string, Map<string, number>>();
 
   for (const r of existing || []) {

@@ -60,7 +60,8 @@ class MozHistoryInsights extends LitElement {
         await this.loadSavedInsights()
     }
 
-    private handleGenerateInsights = async () => {
+    private handleGenerateInsights = async (source: 'history' | 'conversation' = 'history') => {
+        if (this.isLoading) return;
         this.isLoading = true; this.error = null; this.insights = null
          // phase timers
          const t0 = performance.now();
@@ -69,51 +70,46 @@ class MozHistoryInsights extends LitElement {
          let tLLM0 = t0, tLLM1 = t0;
          let tSave0 = t0, tSave1 = t0;
          let promptWordCount = 0;
-        try {
-            // HISTORY
-            tHistory0 = performance.now();
+         try {
+          tHistory0 = performance.now();
+          let profile: unknown;
+
+          if (source === 'history') {
+            // history
             const baseRows = await getRecentHistory({ days: 60, maxResults: 500 });
             console.debug('[MozHistory] baseRows:', baseRows.length)
-            tHistory1 = performance.now();
-
+            const rows: ProfileRow[] = addWeights(baseRows, 14)
+            profile = generateProfileInputs(rows)
+          } else {
+            // conversation
             const chatHistory = await getUserChats({ days: 30, maxConversations: 50, halfLifeDays: 14 });
             console.debug(`[ChatHistory] ${JSON.stringify(chatHistory)}`)
+            profile = chatHistory;
+          }
+          tHistory1 = performance.now();
 
-            // PREP (weights, profile, prompt)
-            tPrep0 = performance.now();
-            const rows: ProfileRow[] = addWeights(baseRows, 14)
-            const profile = generateProfileInputs(rows)
-            // console.debug(`profile => ${JSON.stringify(profile)}`)
-            const existing = await getExistingInsights('local')
-            const prompt = buildUserPrompt(profile, existing, 'history')
-            promptWordCount = countWords(prompt)
-            tPrep1 = performance.now();
+          // PREP (weights, profile, prompt)
+          tPrep0 = performance.now();
+          const existing = await getExistingInsights('local')
+          const prompt = buildUserPrompt(profile, existing, source)
+          promptWordCount = countWords(prompt)
+          tPrep1 = performance.now();
 
-            // LLM
-            tLLM0 = performance.now();
-            const out = await summarizeCategories(prompt)
-            tLLM1 = performance.now();
+          // LLM
+          tLLM0 = performance.now();
+          const out = await summarizeCategories(prompt)
+          tLLM1 = performance.now();
+          this.insights = out
+          console.debug(`[Insights/${source}]`, JSON.stringify(out));
 
-            this.insights = out
-            console.debug(`[MozHistory] insights: ${JSON.stringify(out)}`)
-
-            const promptChat = buildUserPrompt(chatHistory, existing, 'conversation')
-            const outChat = await summarizeCategories(promptChat)
-
-            console.debug(`[ChatHistory] insights: ${JSON.stringify(outChat)}`)
-
-            // persistence logic
-            await saveInsightsFromCategories(this.insights, 'local', 'history')
-            await saveInsightsFromCategories(outChat, 'local', 'conversation')
-            // refresh the cached view so reopening the panel shows latest data
-            await this.loadSavedInsights()
-
-            // SAVE
-            tSave0 = tLLM1;
-            tSave1 = performance.now();
-        } catch (e: any) {
-            this.error = e?.message ?? String(e)
-        } finally {
+          // SAVE
+          tSave0 = tLLM1;
+          await saveInsightsFromCategories(out, 'local', source)
+          await this.loadSavedInsights()
+          tSave1 = performance.now();
+         } catch (e: any) {
+          this.error = e?.message ?? String(e)
+         } finally {
           const tend = performance.now();
           // ensure monotonicity in case of early failures
           tHistory1 ||= tHistory0;
@@ -389,9 +385,14 @@ class MozHistoryInsights extends LitElement {
             <div class="container">
               <div class="controls-section">
                 <button class="primary-button"
-                  @click=${this.handleGenerateInsights}
+                  @click=${() => this.handleGenerateInsights('history')}
                   ?disabled=${this.isLoading || !this.togetherKey}>
-                  ${this.isLoading ? 'Analyzing...' : 'Generate Insights'}
+                  ${this.isLoading ? 'Analyzing...' : 'Generate Insights - history'}
+                </button>
+                <button class="secondary-button"
+                  @click=${() => this.handleGenerateInsights('conversation')}
+                  ?disabled=${this.isLoading || !this.togetherKey}>
+                  ${this.isLoading ? 'Analyzing...' : 'Generate Insights - conversation'}
                 </button>
                 ${this.genBreakdown ? html`
                   <div class="duration">
