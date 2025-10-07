@@ -521,6 +521,48 @@ export default class extends ExtensionAPI {
           }
         },
 
+        async getWeatherCity(): Promise<string | null> {
+          try {
+            // Access Activity Stream Redux state from AboutNewTab
+            const city =
+              lazy.AboutNewTab?.activityStream?.store
+                ?.getState?.()
+                ?.Weather?.locationData?.city || null
+            return city ?? null
+          } catch (error) {
+            console.error('Failed to get weather city:', error)
+            return null
+          }
+        },
+
+        async getWeatherLocation(): Promise<{
+          city: string | null
+          region: string | null
+          country: string | null
+          countryCode: string | null
+        }> {
+          try {
+            const state = lazy.AboutNewTab?.activityStream?.store?.getState?.()
+            const weather = state?.Weather
+            const data = weather?.locationData || weather?.location || weather?.geo || {}
+
+            const city = data?.city ?? data?.name ?? null
+            const region = data?.region ?? data?.regionName ?? data?.state ?? null
+            const country = data?.country ?? data?.countryName ?? null
+            const countryCode = data?.countryCode ?? data?.country_code ?? null
+
+            return {
+              city: city ?? null,
+              region: region ?? null,
+              country: country ?? null,
+              countryCode: countryCode ?? null,
+            }
+          } catch (error) {
+            console.error('Failed to get weather location:', error)
+            return { city: null, region: null, country: null, countryCode: null }
+          }
+        },
+
         async getLastFocusedUrl(): Promise<string | null> {
           const window = Services.wm.getMostRecentBrowserWindow()
           const urlbar = window.gURLBar

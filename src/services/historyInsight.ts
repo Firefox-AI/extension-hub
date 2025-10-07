@@ -335,8 +335,7 @@ export async function summarizeCategories(profileText: string,
       { role: 'user', content: profileText },
     ] as any,
     // Prefer json_object for consistency with other services
-    response_format: { type: 'json_object', schema: CATEGORY_ARRAY_SCHEMA, strict: true },
-    timeoutMs: 20000,
+    response_format: { type: 'json_object', schema: CATEGORY_ARRAY_SCHEMA, strict: true }
   })
 
   const raw = (request as any)?.choices?.[0]?.message?.content ?? ''
@@ -352,8 +351,7 @@ export async function summarizeCategories(profileText: string,
         { role: 'user', content: profileText },
         { role: 'user', content: 'The previous attempt merged everything into one category. Now produce 3–8 distinct categories, strictly following the schema.' },
       ] as any,
-      response_format: { type: 'json_object', schema: CATEGORY_ARRAY_SCHEMA },
-      timeoutMs: 20000,
+      response_format: { type: 'json_object', schema: CATEGORY_ARRAY_SCHEMA }
     })
     const nudgedRaw = (nudged as any)?.choices?.[0]?.message?.content ?? ''
     json = extractJSON(nudgedRaw)

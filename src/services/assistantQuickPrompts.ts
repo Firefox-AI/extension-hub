@@ -98,8 +98,7 @@ async function generateQuickPrompts(filled: string, n: number): Promise<string[]
       { role: 'system', content: 'Return only valid JSON that matches the provided schema.' },
       { role: 'user', content: filled },
     ] as any,
-    response_format: { type: 'json_object', schema: QUICK_PROMPTS_SCHEMA },
-    timeoutMs: 30000,
+    response_format: { type: 'json_object', schema: QUICK_PROMPTS_SCHEMA }
   })
 
   const text = ((result as any).choices?.[0]?.message?.content || '').trim()
