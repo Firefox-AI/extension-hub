@@ -5,71 +5,160 @@ import {
   generateProfileInputs,
   buildUserPrompt,
   summarizeCategories,
-  type HistoryRow,
+  getExistingInsights,
+  saveInsightsFromCategories,
   type ProfileRow,
 } from '../services/historyInsight'
+import {
+  getUserChats,
+} from '../services/chatInsight'
 import { LocalStorageKeys } from '../../const'
 
 
+type DurationBreakdown = {
+  total_ms: number
+  history_ms: number
+  prepare_ms: number
+  llm_ms: number
+  save_ms: number
+  prompt_words?: number
+}
+
+function fmtMs(ms: number) {
+  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`
+}
+
+function countWords(text: string) {
+  const trimmed = text.trim()
+  return trimmed ? trimmed.split(/\s+/).length : 0
+}
+
 class MozHistoryInsights extends LitElement {
 
-        // --- add state for quick testing ---
+    // --- add state for quick testing ---
     isLoading = false
     error: string | null = null
-    historyPreview: HistoryRow[] = []
     insights: any = null
     togetherKey = ''
+
+    genBreakdown: DurationBreakdown | null = null
 
     static properties = {
         isLoading: { type: Boolean },
         error: { type: String },
-        historyPreview: { type: Array },
         insights: { type: Object },
         togetherKey: { type: String },
     }
 
     // Auto-run once the component is in the DOM
     async firstUpdated() {
-        console.debug('[MozHistory] firstUpdated -> calling getRecentHistory()')
-        await this.handleLoadHistory(1, 5)   // 1 day, 5 rows for a super-fast test
         const { togetherai_api_key } = await browser.storage.local.get([
           LocalStorageKeys.TOGETHERAI_API_KEY,
         ])
         this.togetherKey = togetherai_api_key || ''
+        // hydrate previously saved insights so the panel is never empty on load
+        await this.loadSavedInsights()
     }
 
-    // private saveKey = async () => {
-    //     await browser.storage.sync.set({ TOGETHER_OPENAI_API_KEY: this.togetherKey })
-    // }
-
-    // Clickable test hook
-    private handleLoadHistory = async (days = 60, maxResults = 200) => {
-        console.debug("handleLoadHistory")
-        this.isLoading = true
-        this.error = null
-        try {
-            const rows = await getRecentHistory({ days, maxResults })
-            this.historyPreview = rows.slice(0, 50)
-            console.debug('[MozHistory] rows:', rows.length)
-        } catch (e: any) {
-            this.error = e?.message ?? String(e)
-        } finally { this.isLoading = false }
-    }
-
-    private handleGenerateInsights = async () => {
+    private handleGenerateInsights = async (source: 'history' | 'conversation' = 'history') => {
+        if (this.isLoading) return;
         this.isLoading = true; this.error = null; this.insights = null
-        try {
-            const baseRows = await getRecentHistory({ days: 60, maxResults: 500 })
+         // phase timers
+         const t0 = performance.now();
+         let tHistory0 = t0, tHistory1 = t0;
+         let tPrep0 = t0, tPrep1 = t0;
+         let tLLM0 = t0, tLLM1 = t0;
+         let tSave0 = t0, tSave1 = t0;
+         let promptWordCount = 0;
+         try {
+          tHistory0 = performance.now();
+          let profile: unknown;
+
+          if (source === 'history') {
+            // history
+            const baseRows = await getRecentHistory({ days: 60, maxResults: 500 });
+            console.debug('[MozHistory] baseRows:', baseRows.length)
             const rows: ProfileRow[] = addWeights(baseRows, 14)
-            const profile = generateProfileInputs(rows)
-            console.debug(`profile => ${JSON.stringify(profile)}`)
-            const prompt = buildUserPrompt(profile)
-            const out = await summarizeCategories(prompt)
-            this.insights = out
-            console.debug(`[MozHistory] insights: ${JSON.stringify(out)}`)
-        } catch (e: any) {
-            this.error = e?.message ?? String(e)
-        } finally { this.isLoading = false }
+            profile = generateProfileInputs(rows)
+          } else {
+            // conversation
+            const chatHistory = await getUserChats({ days: 30, maxConversations: 50, halfLifeDays: 14 });
+            console.debug(`[ChatHistory] ${JSON.stringify(chatHistory)}`)
+            profile = chatHistory;
+          }
+          tHistory1 = performance.now();
+
+          // PREP (weights, profile, prompt)
+          tPrep0 = performance.now();
+          const existing = await getExistingInsights('local')
+          const prompt = buildUserPrompt(profile, existing, source)
+          promptWordCount = countWords(prompt)
+          tPrep1 = performance.now();
+
+          // LLM
+          tLLM0 = performance.now();
+          const out = await summarizeCategories(prompt)
+          tLLM1 = performance.now();
+          this.insights = out
+          console.debug(`[Insights/${source}]`, JSON.stringify(out));
+
+          // SAVE
+          tSave0 = tLLM1;
+          await saveInsightsFromCategories(out, 'local', source)
+          await this.loadSavedInsights()
+          tSave1 = performance.now();
+         } catch (e: any) {
+          this.error = e?.message ?? String(e)
+         } finally {
+          const tend = performance.now();
+          // ensure monotonicity in case of early failures
+          tHistory1 ||= tHistory0;
+          tPrep1 ||= tPrep0;
+          tLLM1 ||= tLLM0;
+          tSave1 ||= tend;
+
+          this.genBreakdown = {
+            total_ms: tend - t0,
+            history_ms: Math.max(0, tHistory1 - tHistory0),
+            prepare_ms: Math.max(0, tPrep1 - tPrep0),
+            llm_ms: Math.max(0, tLLM1 - tLLM0),
+            save_ms: Math.max(0, tSave1 - tSave0),
+            prompt_words: promptWordCount,
+          };
+          this.isLoading = false;
+        }
+    }
+
+    private async loadSavedInsights() {
+      try {
+        const existing = await getExistingInsights('local')
+        if (!Array.isArray(existing) || existing.length === 0) return
+
+        const grouped = new Map<string, { name: string; attrs: { name: string; weight: number }[] }>()
+        for (const record of existing) {
+          const category = record.category?.trim()
+          const attribute = record.user_attribute?.trim()
+          if (!category || !attribute) continue
+          if (!grouped.has(category)) {
+            grouped.set(category, { name: category, attrs: [] })
+          }
+          grouped.get(category)!.attrs.push({ name: attribute, weight: record.weight ?? 0 })
+        }
+
+        const categories = Array.from(grouped.values()).map(({ name, attrs }) => {
+          const sorted = attrs
+            .slice()
+            .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
+          return {
+            name,
+            top_user_attributes: sorted.map((item) => item.name),
+          }
+        })
+
+        this.insights = { categories }
+      } catch (err) {
+        console.warn('[MozHistory] failed to load saved insights', err)
+      }
     }
 
     static styles = css`
@@ -90,6 +179,12 @@ class MozHistoryInsights extends LitElement {
 
     a {
       color: var(--color-link);
+    }
+
+    .duration {
+      margin-top: 8px;
+      font-size: 12px;
+      opacity: 0.9;
     }
 
     .wrapper {
@@ -290,10 +385,25 @@ class MozHistoryInsights extends LitElement {
             <div class="container">
               <div class="controls-section">
                 <button class="primary-button"
-                  @click=${this.handleGenerateInsights}
+                  @click=${() => this.handleGenerateInsights('history')}
                   ?disabled=${this.isLoading || !this.togetherKey}>
-                  ${this.isLoading ? 'Analyzing...' : 'Generate Insights'}
+                  ${this.isLoading ? 'Analyzing...' : 'Generate Insights - history'}
                 </button>
+                <button class="secondary-button"
+                  @click=${() => this.handleGenerateInsights('conversation')}
+                  ?disabled=${this.isLoading || !this.togetherKey}>
+                  ${this.isLoading ? 'Analyzing...' : 'Generate Insights - conversation'}
+                </button>
+                ${this.genBreakdown ? html`
+                  <div class="duration">
+                    Last run: <b>${fmtMs(this.genBreakdown.total_ms)}</b>
+                    <span> (history ${fmtMs(this.genBreakdown.history_ms)},
+                    prep ${fmtMs(this.genBreakdown.prepare_ms)},
+                    model ${fmtMs(this.genBreakdown.llm_ms)},
+                    save ${fmtMs(this.genBreakdown.save_ms)})</span>
+                    <span> • prompt ${this.genBreakdown.prompt_words ?? 0} words</span>
+                  </div>
+                ` : ''}
               </div>
       
               ${this.error ? html`<div class="error-message">${this.error}</div>` : ''}
