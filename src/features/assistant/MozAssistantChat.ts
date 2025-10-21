@@ -23,6 +23,7 @@ class MozAssistantChat extends LitElement {
   private currentTabId?: number
   private currentUrl: string = ''
   private messageInsights: Record<number, Array<{ tag: string; value: string }>> = {}
+  conversationTitle: string = 'Assistant'
 
   static properties = {
     messages: { type: Array },
@@ -89,6 +90,7 @@ class MozAssistantChat extends LitElement {
       let tagBuffer = ''
       let visible = ''
       const insights: Array<{ tag: string; value: string }> = []
+      let capturedTitle: string | null = null
 
       const onDelta = (delta: string) => {
         for (let i = 0; i < delta.length; i++) {
@@ -99,8 +101,18 @@ class MozAssistantChat extends LitElement {
               tagBuffer = ''
             } else {
               const raw = tagBuffer.trim()
-              const m = /^\s*insight\s*:\s*(.+)$/i.exec(raw)
-              if (m && m[1]) insights.push({ tag: 'insight', value: m[1].trim() })
+              const insightMatch = /^\s*insight\s*:\s*(.+)$/i.exec(raw)
+              const titleMatch = /^\s*title\s*:\s*(.+)$/i.exec(raw)
+              
+              if (insightMatch && insightMatch[1]) {
+                insights.push({ tag: 'insight', value: insightMatch[1].trim() })
+              } else if (titleMatch && titleMatch[1] && !capturedTitle) {
+                // Capture title but don't add to visible content
+                capturedTitle = titleMatch[1].trim()
+                this.conversationTitle = capturedTitle
+                console.log('[assistant] captured title:', capturedTitle)
+              }
+              
               insideTag = false
               tagBuffer = ''
             }
@@ -164,6 +176,7 @@ class MozAssistantChat extends LitElement {
     assistantStore.clear()
     this.refreshQuickPrompts()
     this.messageInsights = {}
+    this.conversationTitle = 'Assistant'
   }
 
   render() {
@@ -179,7 +192,7 @@ class MozAssistantChat extends LitElement {
       <div class="wrapper">
         <div class="container">
           <div class="header">
-            <h3 class="title">Assistant</h3>
+            <h3 class="title">${this.conversationTitle}</h3>
             <label class="toggle">
               <input
                 type="checkbox"
