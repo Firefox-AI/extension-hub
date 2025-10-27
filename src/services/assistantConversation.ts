@@ -38,6 +38,7 @@ Examples of Insight Tagging:
 - User asks about meals: "This recipe fits your interest in cooking pattern §insight: seasonal cooking§ and healthy recipes §insight: healthy recipes§:..."
 - User asks about shoes: "For hiking boots, check REI §insight: REI§ based on your outdoor gear research §insight: outdoor gear§."
 
+{title_prompt}
 User insights:
 {insights}
 
@@ -46,6 +47,15 @@ User insights:
 Today's date: {today}
 User's location: {city}
 The user is currently viewing this tab page: {current_tab}`
+
+const titleGenerationRules = `
+# Title Generation Rules
+
+At the start of your response, you must create a concise title for the conversation based on the user's message. 
+The title should be less than 6 words and should reflect the main topic or intent of the user's message. 
+Do not end with punctuation (no period, question mark, etc.). Do not generate questions as titles.
+
+Format the title as follows: §title: title§`
 
 function fillPrompt(
   prompt: string,
@@ -67,9 +77,15 @@ function ensureSystem(
   tab: any | null,
   insights: string,
   city: string,
+  isFirstUserMessage: boolean = false,
 ): ChatMessage[] {
   if (!messages.length || messages[0].role !== 'system') {
-    const content = fillPrompt(defaultSystemPrompt, tab, insights, city)
+    let promptToUse = defaultSystemPrompt
+    // Add title generation rules only for the first user message
+    if (isFirstUserMessage) {
+      promptToUse = defaultSystemPrompt .replace('{title_prompt}', titleGenerationRules)
+    }
+    const content = fillPrompt(promptToUse, tab, insights, city)
     console.log("SYSTEM PROMPT:", content)
     return [{ role: 'system', content }, ...messages]
   }
@@ -105,7 +121,13 @@ export async function sendAndAppend(userText: string) {
     city = 'Unknown'
   }
 
-  const messages = ensureSystem(assistantStore.getAll(), tab ?? null, insightsText, city)
+  // Check if this is the first user message (only user message so far)
+  const allMessages = assistantStore.getAll()
+  const userMessageCount = allMessages.filter(m => m.role === 'user').length
+  const isFirstUserMessage = userMessageCount === 1
+  console.log('[assistant] isFirstUserMessage:', allMessages)
+
+  const messages = ensureSystem(assistantStore.getAll(), tab ?? null, insightsText, city, isFirstUserMessage)
 
   // Temporarily prepend instruction to the last user message ONLY for the
   // request sent to the LLM (not stored or shown in UI).
@@ -158,7 +180,12 @@ export async function sendAndStream(
     city = 'Unknown'
   }
 
-  const messages = ensureSystem(assistantStore.getAll(), tab ?? null, insightsText, city)
+  // Check if this is the first user message (only user message so far)
+  const allMessages = assistantStore.getAll()
+  const userMessageCount = allMessages.filter(m => m.role === 'user').length
+  const isFirstUserMessage = userMessageCount === 1
+
+  const messages = ensureSystem(assistantStore.getAll(), tab ?? null, insightsText, city, isFirstUserMessage)
   const PREFIX = 'Instruction: do not search the web unless absolutely needed to or asked real time information or knowledge.\nQuery: '
   const modifiedForSend: ChatMessage[] = (() => {
     const cloned = messages.map((m) => ({ ...m }))
